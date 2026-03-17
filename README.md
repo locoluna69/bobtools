@@ -1,6 +1,6 @@
-# Star Citizen Overlay Starter
+# BobTools
 
-A small WPF/.NET 8 starter project for a Windows overlay-style OCR helper.
+A WPF/.NET 8 Windows overlay-style OCR helper for BobTools workflows.
 
 ## Included
 - WPF desktop shell
@@ -25,15 +25,15 @@ A small WPF/.NET 8 starter project for a Windows overlay-style OCR helper.
 - Windows
 - .NET 8 SDK
 - Visual Studio 2022 or newer with desktop development workload
-- Tesseract language data files placed in `StarCitizenOverlayStarter/Assets/tessdata`
+- Tesseract language data files placed in the project folder under `Assets/tessdata`
 
 ## First run steps
-1. Open `StarCitizenOverlayStarter.sln` in Visual Studio.
+1. Open `BobTools.sln` in Visual Studio.
 2. Restore NuGet packages.
-3. Put `eng.traineddata` in `StarCitizenOverlayStarter/Assets/tessdata`.
+3. Put `eng.traineddata` in the project folder under `Assets/tessdata`.
 4. Build and run.
-5. Click **Set Scan Area** and drag over the target UI area.
-6. Press `Ctrl+Shift+Q` or click **Capture Now**.
+5. Click **Set Signature** or **Set Mining** and drag over the target UI area.
+6. Press `Ctrl+Shift+Q` or use the capture controls in the app.
 7. Edit OCR output and click **Accept**.
 
 ## Good next improvements

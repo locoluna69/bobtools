@@ -1,0 +1,554 @@
+<Window x:Class="BobTools.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="BobTools"
+        Height="620" Width="1460"
+        MinHeight="420" MinWidth="980"
+        WindowStartupLocation="Manual"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        Topmost="True"
+        ResizeMode="CanResizeWithGrip">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </Window.Resources>
+    <Border x:Name="RootBorder"
+            Margin="8"
+            CornerRadius="12"
+            Background="#B3111827"
+            BorderBrush="#9938BDF8"
+            BorderThickness="1"
+            MouseLeftButtonDown="RootBorder_MouseLeftButtonDown">
+        <Grid Margin="12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="14" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="14" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock FontSize="22" FontWeight="Bold" Foreground="White" Text="BobTools" />
+                    <TextBlock Margin="0,2,0,0" Foreground="#BBD5E1" Text="Top overlay — drag frame to reposition." />
+                </StackPanel>
+
+                <Border Grid.Column="2" Padding="10" CornerRadius="8" Background="#8A0F172A" BorderBrush="#334155" BorderThickness="1">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel>
+                            <TextBlock FontWeight="Bold" Foreground="White" Text="Capture" />
+                            <TextBlock Margin="0,4,0,0" Foreground="#D1D5DB" Text="{Binding SignatureCaptureRegionSummary, StringFormat=Signature: {0}}" />
+                            <TextBlock Margin="0,2,0,0" Foreground="#D1D5DB" Text="{Binding MiningCaptureRegionSummary, StringFormat=Mining: {0}}" />
+                        </StackPanel>
+
+                        <WrapPanel Grid.Column="2" VerticalAlignment="Center">
+                            <Button Content="Set Signature" Width="118" Margin="0,0,8,8" Command="{Binding SelectSignatureRegionCommand}" />
+                            <Button Content="Capture Signature" Width="128" Margin="0,0,8,8" Command="{Binding CaptureSignatureCommand}" />
+                            <Button Content="Set Mining" Width="108" Margin="0,0,8,8" Command="{Binding SelectMiningRegionCommand}" />
+                            <Button Content="Capture Mining" Width="118" Margin="0,0,8,8" Command="{Binding CaptureMiningCommand}" />
+                            <Button Content="Queue Folder" Width="118" Margin="0,0,8,8" Command="{Binding LoadLiveMiningFolderCommand}" />
+                            <ComboBox Width="140" Height="28" Margin="0,0,8,8"
+                                      ItemsSource="{Binding CaptureProfileOptions}"
+                                      DisplayMemberPath="DisplayName"
+                                      SelectedValuePath="Value"
+                                      SelectedValue="{Binding SelectedCaptureProfile}" />
+                            <ComboBox Width="190" Height="28" Margin="0,0,8,8"
+                                      ItemsSource="{Binding OcrModeOptions}"
+                                      DisplayMemberPath="DisplayName"
+                                      SelectedValuePath="Value"
+                                      SelectedValue="{Binding SelectedOcrMode}" />
+                            <CheckBox Margin="0,5,12,0" VerticalAlignment="Center" Foreground="White"
+                                      Content="Save debug"
+                                      IsChecked="{Binding SaveDebugImages}" />
+                                <Button Width="132" Margin="0,0,0,8" Content="Open Debug Folder" Command="{Binding OpenDebugFolderCommand}"
+                                    Visibility="{Binding SaveDebugImages, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                        </WrapPanel>
+
+                        <TextBlock Grid.Column="4" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="220"
+                                   Foreground="#94A3B8"
+                                   Text="Debug captures save under LocalAppData\BobTools\DebugCaptures." />
+                    </Grid>
+                </Border>
+
+                <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Top">
+                    <Button Width="34" Height="28" Margin="0,0,8,0" Click="MinimizeButton_Click" Content="—"
+                            Background="#334155" Foreground="White" BorderBrush="#475569" />
+                    <Button Width="34" Height="28" Click="CloseButton_Click" Content="✕"
+                            Background="#7F1D1D" Foreground="White" BorderBrush="#991B1B" />
+                </StackPanel>
+            </Grid>
+
+            <TabControl Grid.Row="1" Margin="0,10,0,0" Background="#6B0F172A" BorderBrush="#334155" Foreground="White">
+                <TabItem Header="Live Results">
+                    <Grid Margin="10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="10" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Margin="0,0,0,4">
+                            <TextBlock Foreground="#A7F3D0" FontWeight="SemiBold" Text="{Binding SignatureResourceSummary}" />
+                            <TextBlock Margin="0,2,0,0" Foreground="#93C5FD" FontWeight="SemiBold" Text="{Binding MiningRockSummary}" TextWrapping="Wrap" />
+                            <TextBlock Margin="0,8,0,0" Foreground="#E5E7EB" Text="{Binding LiveMiningQueueSummary}" TextWrapping="Wrap" />
+                            <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" Text="{Binding CurrentSessionId, StringFormat=Session: {0}}" TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <TextBlock Margin="0,0,0,10" Foreground="#94A3B8" Text="Mining captures are queued immediately and processed in the background. Newest captures appear first." TextWrapping="Wrap" />
+                                <ItemsControl ItemsSource="{Binding LiveMiningResults}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Margin="0,0,0,12" Padding="12" CornerRadius="10" Background="#8A0F172A" BorderBrush="#334155" BorderThickness="1">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="260" />
+                                                        <ColumnDefinition Width="12" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <StackPanel>
+                                                        <TextBlock Foreground="White" FontWeight="SemiBold" Text="{Binding DisplayName}" TextWrapping="Wrap" />
+                                                        <TextBlock Margin="0,4,0,0" Foreground="#93C5FD" Text="{Binding ProcessingState}" TextWrapping="Wrap" />
+                                                        <Border Margin="0,10,0,0" Background="#0F172A" BorderBrush="#334155" BorderThickness="1" CornerRadius="6" Height="170">
+                                                            <Image Source="{Binding ProcessedPreviewImage}" Stretch="Uniform" />
+                                                        </Border>
+                                                    </StackPanel>
+
+                                                    <StackPanel Grid.Column="2">
+                                                        <TextBlock Foreground="#A7F3D0" FontWeight="SemiBold" Text="{Binding Summary}" TextWrapping="Wrap" />
+
+                                                        <Grid Margin="0,10,0,8">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="10" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <Grid.RowDefinitions>
+                                                                <RowDefinition Height="Auto" />
+                                                                <RowDefinition Height="Auto" />
+                                                                <RowDefinition Height="Auto" />
+                                                                <RowDefinition Height="Auto" />
+                                                                <RowDefinition Height="Auto" />
+                                                                <RowDefinition Height="Auto" />
+                                                            </Grid.RowDefinitions>
+
+                                                            <TextBlock Text="Location" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                            <TextBox Grid.Column="2" Text="{Binding EditableLocation, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                            <TextBlock Grid.Row="1" Text="Material" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                            <TextBox Grid.Row="1" Grid.Column="2" Text="{Binding EditableMaterial, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                            <TextBlock Grid.Row="2" Text="Mass" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                            <TextBox Grid.Row="2" Grid.Column="2" Text="{Binding EditableMass, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                            <TextBlock Grid.Row="3" Text="Resistance" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                            <TextBox Grid.Row="3" Grid.Column="2" Text="{Binding EditableResistance, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                            <TextBlock Grid.Row="4" Text="Instability" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                            <TextBox Grid.Row="4" Grid.Column="2" Text="{Binding EditableInstability, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                            <TextBlock Grid.Row="5" Text="Composition" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                            <TextBox Grid.Row="5" Grid.Column="2" Text="{Binding EditableComposition, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                        </Grid>
+
+                                                        <WrapPanel Margin="0,0,0,8">
+                                                            <Button Content="Add Row" Width="100" Margin="0,0,8,0" Command="{Binding AddRowCommand}" />
+                                                            <Button Content="Save Result"
+                                                                    Width="110"
+                                                                    Command="{Binding SaveCommand}"
+                                                                    Style="{StaticResource DirtyAwareSaveButtonStyle}"
+                                                                    Tag="{Binding IsDirty}" />
+                                                        </WrapPanel>
+
+                                                        <DataGrid ItemsSource="{Binding EditableElements}"
+                                                                  AutoGenerateColumns="False"
+                                                                  CanUserAddRows="False"
+                                                                  HeadersVisibility="Column"
+                                                                  Background="#0F172A"
+                                                                  Foreground="#E5E7EB"
+                                                                  BorderBrush="#334155"
+                                                                  RowBackground="#0F172A"
+                                                                  AlternatingRowBackground="#111827"
+                                                                  GridLinesVisibility="Horizontal"
+                                                                  HorizontalGridLinesBrush="#334155"
+                                                                  VerticalGridLinesBrush="#334155"
+                                                                  MinHeight="180">
+                                                            <DataGrid.Resources>
+                                                                <Style TargetType="DataGridColumnHeader">
+                                                                    <Setter Property="Background" Value="#1E293B" />
+                                                                    <Setter Property="Foreground" Value="#E5E7EB" />
+                                                                    <Setter Property="BorderBrush" Value="#475569" />
+                                                                    <Setter Property="BorderThickness" Value="0,0,0,1" />
+                                                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                                                    <Setter Property="Padding" Value="8,6" />
+                                                                </Style>
+                                                                <Style TargetType="DataGridCell">
+                                                                    <Setter Property="Background" Value="#0F172A" />
+                                                                    <Setter Property="Foreground" Value="#E5E7EB" />
+                                                                    <Setter Property="BorderBrush" Value="#334155" />
+                                                                    <Setter Property="BorderThickness" Value="0,0,0,1" />
+                                                                    <Setter Property="Padding" Value="6,4" />
+                                                                    <Setter Property="VerticalContentAlignment" Value="Center" />
+                                                                    <Style.Triggers>
+                                                                        <Trigger Property="IsSelected" Value="True">
+                                                                            <Setter Property="Background" Value="#1D4ED8" />
+                                                                            <Setter Property="Foreground" Value="White" />
+                                                                        </Trigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                                <Style x:Key="LiveGridTextBlockStyle" TargetType="TextBlock">
+                                                                    <Setter Property="Foreground" Value="#E5E7EB" />
+                                                                    <Setter Property="VerticalAlignment" Value="Center" />
+                                                                </Style>
+                                                                <Style x:Key="LiveGridEditingTextBoxStyle" TargetType="TextBox">
+                                                                    <Setter Property="Background" Value="#0F172A" />
+                                                                    <Setter Property="Foreground" Value="#E5E7EB" />
+                                                                    <Setter Property="BorderBrush" Value="#475569" />
+                                                                    <Setter Property="BorderThickness" Value="1" />
+                                                                    <Setter Property="CaretBrush" Value="#E5E7EB" />
+                                                                    <Setter Property="Padding" Value="4,2" />
+                                                                    <Setter Property="SelectionBrush" Value="#2563EB" />
+                                                                </Style>
+                                                            </DataGrid.Resources>
+                                                            <DataGrid.Columns>
+                                                                <DataGridTextColumn Header="Element"
+                                                                                    Binding="{Binding Element, UpdateSourceTrigger=PropertyChanged}"
+                                                                                    Width="*"
+                                                                                    ElementStyle="{StaticResource LiveGridTextBlockStyle}"
+                                                                                    EditingElementStyle="{StaticResource LiveGridEditingTextBoxStyle}" />
+                                                                <DataGridTextColumn Header="Percentage"
+                                                                                    Binding="{Binding PercentageText, UpdateSourceTrigger=PropertyChanged}"
+                                                                                    Width="110"
+                                                                                    ElementStyle="{StaticResource LiveGridTextBlockStyle}"
+                                                                                    EditingElementStyle="{StaticResource LiveGridEditingTextBoxStyle}" />
+                                                                <DataGridTextColumn Header="Quality"
+                                                                                    Binding="{Binding QualityText, UpdateSourceTrigger=PropertyChanged}"
+                                                                                    Width="90"
+                                                                                    ElementStyle="{StaticResource LiveGridTextBlockStyle}"
+                                                                                    EditingElementStyle="{StaticResource LiveGridEditingTextBoxStyle}" />
+                                                                <DataGridTemplateColumn Header="Delete" Width="70">
+                                                                    <DataGridTemplateColumn.CellTemplate>
+                                                                        <DataTemplate>
+                                                                            <Button Content="Delete"
+                                                                                    Padding="6,2"
+                                                                                    Command="{Binding DataContext.DeleteRowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                                                    CommandParameter="{Binding}" />
+                                                                        </DataTemplate>
+                                                                    </DataGridTemplateColumn.CellTemplate>
+                                                                </DataGridTemplateColumn>
+                                                            </DataGrid.Columns>
+                                                        </DataGrid>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+                </TabItem>
+                <TabItem Header="Offline Test">
+                    <Grid Margin="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="2*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="3*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <WrapPanel Grid.Row="0" Grid.ColumnSpan="3" Margin="0,0,0,10">
+                            <TextBlock VerticalAlignment="Center" Margin="0,0,8,0" Foreground="White" Text="Offline box:" />
+                            <ComboBox Width="140" Height="28" Margin="0,0,8,8"
+                                      ItemsSource="{Binding CaptureProfileOptions}"
+                                      DisplayMemberPath="DisplayName"
+                                      SelectedValuePath="Value"
+                                      SelectedValue="{Binding OfflineSelectedCaptureProfile}" />
+                            <Button Width="120" Margin="0,0,8,8" Content="Run OCR Test" Command="{Binding RunOfflineTestCommand}" />
+                                <Button Width="120"
+                                    Margin="0,0,8,8"
+                                    Content="Save Edits"
+                                    Command="{Binding SaveOfflineMiningEditsCommand}"
+                                    Style="{StaticResource DirtyAwareSaveButtonStyle}"
+                                    Tag="{Binding SelectedOfflineMiningResult.IsDirty}" />
+                            <TextBlock VerticalAlignment="Center" Foreground="#94A3B8" Text="Drop one or more screenshots or pre-cropped captures like 01_capture.png; if the saved box does not fit, OCR uses the whole dropped image." />
+                        </WrapPanel>
+
+                        <Border Grid.Row="1" Grid.Column="0" Padding="12" CornerRadius="10" Background="#8A0F172A" BorderBrush="#334155" BorderThickness="1"
+                                AllowDrop="True" DragOver="OfflineDropZone_DragOver" Drop="OfflineDropZone_Drop">
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                                <StackPanel>
+                                    <TextBlock Foreground="White" FontWeight="Bold" Text="Drop Image Here" />
+                                    <TextBlock Margin="0,4,0,8" Foreground="#94A3B8" Text="Supports PNG, JPG, JPEG, and BMP. Multiple files are allowed." />
+                                    <TextBlock Margin="0,0,0,8" Foreground="#D1D5DB" Text="{Binding OfflineImagePath}" TextWrapping="Wrap" />
+                                    <TextBlock Margin="0,0,0,8" Foreground="#94A3B8" Text="{Binding OfflineImageInfo}" />
+                                    <TextBlock Margin="0,0,0,8" Foreground="#94A3B8" Text="{Binding OfflineSelectionModeSummary}" TextWrapping="Wrap" />
+                                    <GroupBox Header="Queued Images" Foreground="White" BorderBrush="#475569" Margin="0,0,0,8">
+                                        <ListBox ItemsSource="{Binding OfflineInputImages}"
+                                                 SelectedItem="{Binding SelectedOfflineInputImage}"
+                                                 DisplayMemberPath="DisplayName"
+                                                 Background="#0F172A"
+                                                 Foreground="#E5E7EB"
+                                                 BorderBrush="#334155"
+                                                 MinHeight="120"
+                                                 MaxHeight="180" />
+                                    </GroupBox>
+                                    <Canvas Width="{Binding OfflinePreviewWidth}" Height="{Binding OfflinePreviewHeight}" HorizontalAlignment="Left" Background="#0F172A">
+                                        <Border Background="#0F172A" BorderBrush="#334155" BorderThickness="1" />
+                                        <Image Source="{Binding OfflinePreviewImage}" Width="{Binding OfflinePreviewWidth}" Height="{Binding OfflinePreviewHeight}" Stretch="Fill" />
+                                        <Border Width="{Binding OfflineSelectionWidth}"
+                                                Height="{Binding OfflineSelectionHeight}"
+                                                Canvas.Left="{Binding OfflineSelectionLeft}"
+                                                Canvas.Top="{Binding OfflineSelectionTop}"
+                                                BorderBrush="#FF22C55E" BorderThickness="2"
+                                                Background="#2222C55E"
+                                                Visibility="{Binding OfflineSelectionVisibility}" />
+                                    </Canvas>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Border>
+
+                        <Grid Grid.Row="1" Grid.Column="2">
+                            <Grid.Style>
+                                <Style TargetType="Grid">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsOfflineMiningSelected}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Grid.Style>
+
+                            <GroupBox Header="Offline OCR Result" Foreground="White" BorderBrush="#475569">
+                                <Grid Margin="4">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="8" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+
+                                    <StackPanel Grid.Row="0">
+                                        <TextBlock Foreground="#A7F3D0" FontWeight="SemiBold" TextWrapping="Wrap"
+                                                   Text="{Binding OfflineSignatureResourceSummary}" />
+                                        <TextBlock Margin="0,2,0,0" Foreground="#93C5FD" FontWeight="SemiBold" TextWrapping="Wrap"
+                                                   Text="{Binding OfflineMiningRockSummary}" />
+                                    </StackPanel>
+                                    <TextBox Grid.Row="2" Text="{Binding OfflineResultText}" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" IsReadOnly="True"
+                                             Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                </Grid>
+                            </GroupBox>
+                        </Grid>
+
+                        <Grid Grid.Row="1" Grid.Column="2">
+                            <Grid.Style>
+                                <Style TargetType="Grid">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsOfflineMiningSelected}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Grid.Style>
+
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="10" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0">
+                                <TextBlock Foreground="#93C5FD" FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding OfflineMiningRockSummary}" />
+                                <ComboBox Margin="0,8,0,0"
+                                          ItemsSource="{Binding OfflineMiningResults}"
+                                          SelectedItem="{Binding SelectedOfflineMiningResult}"
+                                          DisplayMemberPath="DisplayName"
+                                          Background="#0F172A"
+                                          Foreground="#E5E7EB"
+                                          BorderBrush="#334155" />
+                            </StackPanel>
+
+                            <Grid Grid.Row="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1.15*" />
+                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="1.6*" />
+                                </Grid.ColumnDefinitions>
+
+                                <GroupBox Header="OCR Image" Foreground="White" BorderBrush="#475569">
+                                    <Grid Margin="6">
+                                        <Border Background="#0F172A" BorderBrush="#334155" BorderThickness="1" CornerRadius="6">
+                                            <Image Source="{Binding SelectedOfflineMiningResult.ProcessedPreviewImage}" Stretch="Uniform" />
+                                        </Border>
+                                    </Grid>
+                                </GroupBox>
+
+                                <GroupBox Grid.Column="2" Header="Scan Result" Foreground="White" BorderBrush="#475569">
+                                    <ScrollViewer Margin="6" VerticalScrollBarVisibility="Auto">
+                                        <StackPanel>
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" />
+                                                    <ColumnDefinition Width="10" />
+                                                    <ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                </Grid.RowDefinitions>
+                                                <TextBlock Text="Location" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                <TextBox Grid.Column="2" Text="{Binding SelectedOfflineMiningResult.EditableLocation, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                <TextBlock Grid.Row="1" Text="Material" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                <TextBox Grid.Row="1" Grid.Column="2" Text="{Binding SelectedOfflineMiningResult.EditableMaterial, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                <TextBlock Grid.Row="2" Text="Mass" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                <TextBox Grid.Row="2" Grid.Column="2" Text="{Binding SelectedOfflineMiningResult.EditableMass, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                <TextBlock Grid.Row="3" Text="Resistance" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                <TextBox Grid.Row="3" Grid.Column="2" Text="{Binding SelectedOfflineMiningResult.EditableResistance, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                <TextBlock Grid.Row="4" Text="Instability" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                <TextBox Grid.Row="4" Grid.Column="2" Text="{Binding SelectedOfflineMiningResult.EditableInstability, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                <TextBlock Grid.Row="5" Text="Composition" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                <TextBox Grid.Row="5" Grid.Column="2" Text="{Binding SelectedOfflineMiningResult.EditableComposition, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                            </Grid>
+
+                                            <WrapPanel Margin="0,0,0,8">
+                                                <Button Content="Add Row" Width="100" Margin="0,0,8,0" Command="{Binding AddOfflineMiningRowCommand}" />
+                                                <Button Content="Save Result"
+                                                    Width="110"
+                                                    Command="{Binding SaveOfflineMiningEditsCommand}"
+                                                    Style="{StaticResource DirtyAwareSaveButtonStyle}"
+                                                    Tag="{Binding SelectedOfflineMiningResult.IsDirty}" />
+                                            </WrapPanel>
+
+                                            <DataGrid ItemsSource="{Binding SelectedOfflineMiningResult.EditableElements}"
+                                                      AutoGenerateColumns="False"
+                                                      CanUserAddRows="False"
+                                                      HeadersVisibility="Column"
+                                                      Background="#0F172A"
+                                                      Foreground="#E5E7EB"
+                                                      BorderBrush="#334155"
+                                                      RowBackground="#0F172A"
+                                                      AlternatingRowBackground="#111827"
+                                                      GridLinesVisibility="Horizontal"
+                                                      HorizontalGridLinesBrush="#334155"
+                                                      VerticalGridLinesBrush="#334155"
+                                                      MinHeight="220">
+                                                <DataGrid.Resources>
+                                                    <Style TargetType="DataGridColumnHeader">
+                                                        <Setter Property="Background" Value="#1E293B" />
+                                                        <Setter Property="Foreground" Value="#E5E7EB" />
+                                                        <Setter Property="BorderBrush" Value="#475569" />
+                                                        <Setter Property="BorderThickness" Value="0,0,0,1" />
+                                                        <Setter Property="FontWeight" Value="SemiBold" />
+                                                        <Setter Property="Padding" Value="8,6" />
+                                                    </Style>
+                                                    <Style TargetType="DataGridCell">
+                                                        <Setter Property="Background" Value="#0F172A" />
+                                                        <Setter Property="Foreground" Value="#E5E7EB" />
+                                                        <Setter Property="BorderBrush" Value="#334155" />
+                                                        <Setter Property="BorderThickness" Value="0,0,0,1" />
+                                                        <Setter Property="Padding" Value="6,4" />
+                                                        <Setter Property="VerticalContentAlignment" Value="Center" />
+                                                        <Style.Triggers>
+                                                            <Trigger Property="IsSelected" Value="True">
+                                                                <Setter Property="Background" Value="#1D4ED8" />
+                                                                <Setter Property="Foreground" Value="White" />
+                                                            </Trigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                    <Style x:Key="OfflineGridTextBlockStyle" TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="#E5E7EB" />
+                                                        <Setter Property="VerticalAlignment" Value="Center" />
+                                                    </Style>
+                                                    <Style x:Key="OfflineGridEditingTextBoxStyle" TargetType="TextBox">
+                                                        <Setter Property="Background" Value="#0F172A" />
+                                                        <Setter Property="Foreground" Value="#E5E7EB" />
+                                                        <Setter Property="BorderBrush" Value="#475569" />
+                                                        <Setter Property="BorderThickness" Value="1" />
+                                                        <Setter Property="CaretBrush" Value="#E5E7EB" />
+                                                        <Setter Property="Padding" Value="4,2" />
+                                                        <Setter Property="SelectionBrush" Value="#2563EB" />
+                                                    </Style>
+                                                </DataGrid.Resources>
+                                                <DataGrid.Columns>
+                                                    <DataGridTextColumn Header="Element"
+                                                                        Binding="{Binding Element, UpdateSourceTrigger=PropertyChanged}"
+                                                                        Width="*"
+                                                                        ElementStyle="{StaticResource OfflineGridTextBlockStyle}"
+                                                                        EditingElementStyle="{StaticResource OfflineGridEditingTextBoxStyle}" />
+                                                    <DataGridTextColumn Header="Percentage"
+                                                                        Binding="{Binding PercentageText, UpdateSourceTrigger=PropertyChanged}"
+                                                                        Width="110"
+                                                                        ElementStyle="{StaticResource OfflineGridTextBlockStyle}"
+                                                                        EditingElementStyle="{StaticResource OfflineGridEditingTextBoxStyle}" />
+                                                    <DataGridTextColumn Header="Quality"
+                                                                        Binding="{Binding QualityText, UpdateSourceTrigger=PropertyChanged}"
+                                                                        Width="90"
+                                                                        ElementStyle="{StaticResource OfflineGridTextBlockStyle}"
+                                                                        EditingElementStyle="{StaticResource OfflineGridEditingTextBoxStyle}" />
+                                                    <DataGridTemplateColumn Header="Delete" Width="70">
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <Button Content="Delete"
+                                                                        Padding="6,2"
+                                                                        Command="{Binding DataContext.DeleteOfflineMiningRowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                                        CommandParameter="{Binding}" />
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
+                                                </DataGrid.Columns>
+                                            </DataGrid>
+                                        </StackPanel>
+                                    </ScrollViewer>
+                                </GroupBox>
+                            </Grid>
+                        </Grid>
+                    </Grid>
+                </TabItem>
+            </TabControl>
+
+            <Border Grid.Row="2" Margin="0,10,0,0" Padding="10,8" CornerRadius="8" Background="#8A0F172A" BorderBrush="#334155" BorderThickness="1">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Text="{Binding Status}" Foreground="#E5E7EB" />
+                    <TextBlock Grid.Column="2" Foreground="#94A3B8" Text="{Binding LastUsedOcrMode}" />
+                    <TextBlock Grid.Column="4" Foreground="{Binding LastOcrSourceBrush}" Text="{Binding LastOcrSourceSummary}" />
+                    <TextBlock Grid.Column="6" Foreground="#94A3B8" Text="{Binding HotkeyTargetSummary}" />
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</Window>
