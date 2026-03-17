@@ -1,0 +1,17 @@
+{
+    "ID": "GUID",
+    "SESSIONID": "GUID",
+    "TIMESTAMP": "2024-06-01T12:00:00Z",
+    "LOCATION": "Fuego",
+    "MATERIAL": "TITANIUM (ORE)",
+    "MASS": 12899,
+    "RESISTANCE": 24,
+    "INSTABILITY": 69.3,
+    "COMPOSITION": 38.75,
+    "Elements": [
+        {"Element": "TITANIUM (ORE)", "percentage": 42.18, "Quality": 551},
+        {"Element": "ASLARITE (RAW)", "percentage": 8.74, "Quality": 547},
+        {"Element": "AGRICIUM (ORE)", "percentage": 5.59, "Quality": 776},
+        {"Element": "INERT MATERIALS", "percentage": 43.49, "Quality": 0}
+    ]
+}
