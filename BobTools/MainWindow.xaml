@@ -61,28 +61,78 @@
                             <TextBlock Margin="0,2,0,0" Foreground="#D1D5DB" Text="{Binding MiningCaptureRegionSummary, StringFormat=Mining: {0}}" />
                         </StackPanel>
 
-                        <WrapPanel Grid.Column="2" VerticalAlignment="Center">
-                            <Button Content="Set Signature" Width="118" Margin="0,0,8,8" Command="{Binding SelectSignatureRegionCommand}" />
-                            <Button Content="Capture Signature" Width="128" Margin="0,0,8,8" Command="{Binding CaptureSignatureCommand}" />
-                            <Button Content="Set Mining" Width="108" Margin="0,0,8,8" Command="{Binding SelectMiningRegionCommand}" />
-                            <Button Content="Capture Mining" Width="118" Margin="0,0,8,8" Command="{Binding CaptureMiningCommand}" />
-                            <Button Content="Queue Folder" Width="118" Margin="0,0,8,8" Command="{Binding LoadLiveMiningFolderCommand}" />
-                            <ComboBox Width="140" Height="28" Margin="0,0,8,8"
-                                      ItemsSource="{Binding CaptureProfileOptions}"
-                                      DisplayMemberPath="DisplayName"
-                                      SelectedValuePath="Value"
-                                      SelectedValue="{Binding SelectedCaptureProfile}" />
-                            <ComboBox Width="190" Height="28" Margin="0,0,8,8"
-                                      ItemsSource="{Binding OcrModeOptions}"
-                                      DisplayMemberPath="DisplayName"
-                                      SelectedValuePath="Value"
-                                      SelectedValue="{Binding SelectedOcrMode}" />
-                            <CheckBox Margin="0,5,12,0" VerticalAlignment="Center" Foreground="White"
-                                      Content="Save debug"
-                                      IsChecked="{Binding SaveDebugImages}" />
-                                <Button Width="132" Margin="0,0,0,8" Content="Open Debug Folder" Command="{Binding OpenDebugFolderCommand}"
-                                    Visibility="{Binding SaveDebugImages, Converter={StaticResource BooleanToVisibilityConverter}}" />
-                        </WrapPanel>
+                        <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                            <WrapPanel Margin="0,0,0,10">
+                                <Button Style="{StaticResource ImageToolbarButtonStyle}"
+                                        ToolTip="Set Signature area"
+                                        Command="{Binding SelectSignatureRegionCommand}">
+                                    <Image Width="50"
+                                           Height="50"
+                                           Stretch="Uniform"
+                                           Source="pack://siteoforigin:,,,/Assets/images/btn_set_scan.png" />
+                                </Button>
+                                <Button Style="{StaticResource ImageToolbarButtonStyle}"
+                                        ToolTip="Capture Signature"
+                                        Command="{Binding CaptureSignatureCommand}">
+                                    <Image Width="50"
+                                           Height="50"
+                                           Stretch="Uniform"
+                                           Source="pack://siteoforigin:,,,/Assets/images/btn_capture_scan.png" />
+                                </Button>
+                                <Button Style="{StaticResource ImageToolbarButtonStyle}"
+                                        ToolTip="Set Mining area"
+                                        Command="{Binding SelectMiningRegionCommand}">
+                                    <Image Width="50"
+                                           Height="50"
+                                           Stretch="Uniform"
+                                           Source="pack://siteoforigin:,,,/Assets/images/btn_set_mine.png" />
+                                </Button>
+                                <Button Style="{StaticResource ImageToolbarButtonStyle}"
+                                        ToolTip="Capture Mining"
+                                        Command="{Binding CaptureMiningCommand}">
+                                    <Image Width="50"
+                                           Height="50"
+                                           Stretch="Uniform"
+                                           Source="pack://siteoforigin:,,,/Assets/images/btn_capture_mine.png" />
+                                </Button>
+                                <Button Style="{StaticResource ImageToolbarButtonStyle}"
+                                        ToolTip="Queue Folder"
+                                        Command="{Binding LoadLiveMiningFolderCommand}">
+                                    <Image Width="50"
+                                           Height="50"
+                                           Stretch="Uniform"
+                                           Source="pack://siteoforigin:,,,/Assets/images/btn_offline_queue.png" />
+                                </Button>
+                                <Button Style="{StaticResource ImageToolbarButtonStyle}"
+                                        Margin="0"
+                                        ToolTip="Open Debug Folder"
+                                        Command="{Binding OpenDebugFolderCommand}"
+                                        Visibility="{Binding SaveDebugImages, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <Image Width="50"
+                                           Height="50"
+                                           Stretch="Uniform"
+                                           Source="pack://siteoforigin:,,,/Assets/images/btn_open_debug.png" />
+                                </Button>
+                            </WrapPanel>
+
+                            <WrapPanel VerticalAlignment="Center">
+                                <ComboBox Width="148" Height="30" Margin="0,0,10,0"
+                                          ItemsSource="{Binding CaptureProfileOptions}"
+                                          DisplayMemberPath="DisplayName"
+                                          SelectedValuePath="Value"
+                                          SelectedValue="{Binding SelectedCaptureProfile}" />
+                                <ComboBox Width="208" Height="30" Margin="0,0,10,0"
+                                          ItemsSource="{Binding OcrModeOptions}"
+                                          DisplayMemberPath="DisplayName"
+                                          SelectedValuePath="Value"
+                                          SelectedValue="{Binding SelectedOcrMode}" />
+                                <CheckBox Margin="0,6,0,0"
+                                          VerticalAlignment="Center"
+                                          Foreground="White"
+                                          Content="Save debug"
+                                          IsChecked="{Binding SaveDebugImages}" />
+                            </WrapPanel>
+                        </StackPanel>
 
                         <TextBlock Grid.Column="4" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="220"
                                    Foreground="#94A3B8"

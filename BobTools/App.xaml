@@ -11,6 +11,9 @@
         <SolidColorBrush x:Key="AccentBrushTheme" Color="#2563EB" />
         <SolidColorBrush x:Key="AccentHoverBrushTheme" Color="#1D4ED8" />
         <SolidColorBrush x:Key="AccentPressedBrushTheme" Color="#1E40AF" />
+        <SolidColorBrush x:Key="ImageButtonBrushTheme" Color="#162033" />
+        <SolidColorBrush x:Key="ImageButtonHoverBrushTheme" Color="#1D4ED8" />
+        <SolidColorBrush x:Key="ImageButtonPressedBrushTheme" Color="#1E3A8A" />
         <SolidColorBrush x:Key="SaveDirtyBrushTheme" Color="#B45309" />
         <SolidColorBrush x:Key="SaveDirtyBorderBrushTheme" Color="#F59E0B" />
         <SolidColorBrush x:Key="WindowChromeBrushTheme" Color="#111827" />
@@ -45,6 +48,48 @@
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="ButtonBorder" Property="Background" Value="{StaticResource AccentPressedBrushTheme}" />
                                 <Setter Property="BorderBrush" Value="{StaticResource AccentBrushTheme}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ImageToolbarButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="68" />
+            <Setter Property="Height" Value="68" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,10,0" />
+            <Setter Property="Background" Value="{StaticResource ImageButtonBrushTheme}" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushTheme}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="10"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="{StaticResource ImageButtonHoverBrushTheme}" />
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{StaticResource AccentBrushTheme}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="Background" Value="{StaticResource ImageButtonPressedBrushTheme}" />
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{StaticResource AccentBrushTheme}" />
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.92" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.45" />
