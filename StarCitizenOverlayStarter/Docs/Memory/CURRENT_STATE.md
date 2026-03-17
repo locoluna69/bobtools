@@ -35,7 +35,7 @@ BobTools is a Windows WPF overlay app for Star Citizen that:
   - numeric `MASS`, `RESISTANCE`, `INSTABILITY`, and `COMPOSITION`
   - `Elements` array for the per-material breakdown
   - `PARSE_WARNINGS` for reconstructed or incomplete fields
-- Mining OCR now normalizes parsed material names against `Assets/data/mineables.csv`, including tolerant matching for common OCR/spelling drift.
+- Mining OCR now normalizes parsed material names against `Assets/data/commodities.json`, filtered to extractable mining commodities and still tolerant of common OCR/spelling drift.
 - Offline mining now supports a queued multi-image workflow: drop multiple images, run OCR across the batch, inspect the selected OCR image/debug artifact, edit the structured scan result inline, add or delete element rows, and save corrected JSON/CSV output.
 - Offline mining results now track unsaved edits and visually highlight the save buttons when field or element-row changes need to be persisted.
 
@@ -49,7 +49,7 @@ BobTools is a Windows WPF overlay app for Star Citizen that:
 - [Utils/RockScanCsvStore.cs](Utils/RockScanCsvStore.cs)
 - [Utils/RockScanJsonStore.cs](Utils/RockScanJsonStore.cs)
 - [Assets/data/SampleRock.json](Assets/data/SampleRock.json)
-- [Assets/data/mineables.csv](Assets/data/mineables.csv)
+- [Assets/data/commodities.json](Assets/data/commodities.json)
 - [Assets/data/signatures.csv](Assets/data/signatures.csv)
 - [Views/ReviewWindow.xaml](Views/ReviewWindow.xaml)
 - [Views/ReviewWindow.xaml.cs](Views/ReviewWindow.xaml.cs)
@@ -82,7 +82,7 @@ BobTools is a Windows WPF overlay app for Star Citizen that:
 - Mining scan JSON: saved into the matching debug capture folder when available, otherwise `LocalAppData/BobTools/RockScans/Json`
 - Mining session ID: generated once when the app starts and reused until the app closes
 - Signature lookup data: [Assets/data/signatures.csv](Assets/data/signatures.csv)
-- Mining material reference data: [Assets/data/mineables.csv](Assets/data/mineables.csv)
+- Mining material reference data: [Assets/data/commodities.json](Assets/data/commodities.json)
 - Signature icon template: [Assets/images/signature_icon.png](Assets/images/signature_icon.png)
 
 ## Known-good current decisions
@@ -94,7 +94,7 @@ BobTools is a Windows WPF overlay app for Star Citizen that:
 - Use divisor-based CSV lookup for Signature resource matching.
 - Use pattern-based field extraction for Mining and log parsed scans to CSV/JSON.
 - Preserve partial mining elements with parse warnings instead of dropping them when OCR misses a field.
-- Keep `Assets/data/mineables.csv` current, because the mining parser now uses it as the canonical material list for normalization.
+- Keep `Assets/data/commodities.json` current, because the mining parser now uses its extractable commodity entries as the canonical material list for normalization.
 - Offline mining edits persist by overwriting `rock_scan.json` for the selected result and upserting the matching CSV row by rock scan `ID`.
 
 ## Good next steps if work resumes

@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace StarCitizenOverlayStarter.Utils;
@@ -10,11 +11,25 @@ internal static class MineableCatalog
     {
         ["ALUMINIUM"] = "Aluminum",
         ["ALUMINUM"] = "Aluminum",
+        ["ALUMINIUM(ORE)"] = "Aluminum (Ore)",
+        ["ALUMINUM(ORE)"] = "Aluminum (Ore)",
         ["HEPHESTANITE"] = "Hephaestanite",
         ["HEPHAESTANITE"] = "Hephaestanite",
         ["HEPHAESTENITE"] = "Hephaestanite",
-        ["INERT MATERIALS"] = "Inert Material",
-        ["INERT MATERIAL"] = "Inert Material"
+        ["HEPHESTANITE(RAW)"] = "Hephaestanite (Raw)",
+        ["HEPHAESTANITE(RAW)"] = "Hephaestanite (Raw)",
+        ["HEPHAESTENITE(RAW)"] = "Hephaestanite (Raw)",
+        ["INERT MATERIALS"] = "Inert Materials",
+        ["INERT MATERIAL"] = "Inert Materials",
+        ["RAW SILICON"] = "Silicon (Raw)",
+        ["SILICON RAW"] = "Silicon (Raw)",
+        ["QUANTANIUM"] = "Quantanium",
+        ["QUANTANIUM(RAW)"] = "Quantanium (Raw)"
+    };
+    private static readonly Dictionary<string, string> CanonicalNameOverrides = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Quantainium"] = "Quantanium",
+        ["Quantainium (Raw)"] = "Quantanium (Raw)"
     };
 
     public static string Normalize(string? value, out string? warning)
@@ -50,7 +65,7 @@ internal static class MineableCatalog
             return cleanedValue;
         }
 
-        warning = $"Material '{cleanedValue}' was normalized to '{fuzzyMatch.Material}' using mineables.csv.";
+        warning = $"Material '{cleanedValue}' was normalized to '{fuzzyMatch.Material}' using commodities.json.";
         return fuzzyMatch.Material;
     }
 
@@ -107,33 +122,107 @@ internal static class MineableCatalog
 
     private static IReadOnlyList<MineableDefinition> LoadDefinitions()
     {
-        var dataPath = Path.Combine(AppContext.BaseDirectory, "Assets", "data", "mineables.csv");
+        var dataPath = Path.Combine(AppContext.BaseDirectory, "Assets", "data", "commodities.json");
         if (!File.Exists(dataPath))
         {
             return Array.Empty<MineableDefinition>();
         }
 
-        return File.ReadAllLines(dataPath)
-            .Skip(1)
-            .Select(line => line.Trim())
-            .Where(line => !string.IsNullOrWhiteSpace(line))
-            .Select(ParseDefinition)
-            .Where(definition => definition is not null)
-            .Cast<MineableDefinition>()
-            .ToArray();
+        try
+        {
+            using var stream = File.OpenRead(dataPath);
+            using var document = JsonDocument.Parse(stream);
+
+            if (!document.RootElement.TryGetProperty("data", out var dataElement)
+                || dataElement.ValueKind != JsonValueKind.Array)
+            {
+                return Array.Empty<MineableDefinition>();
+            }
+
+            return dataElement
+                .EnumerateArray()
+                .Select(ParseDefinition)
+                .Where(definition => definition is not null)
+                .DistinctBy(definition => definition!.Key)
+                .Cast<MineableDefinition>()
+                .ToArray();
+        }
+        catch (JsonException)
+        {
+            return Array.Empty<MineableDefinition>();
+        }
     }
 
-    private static MineableDefinition? ParseDefinition(string line)
+    private static MineableDefinition? ParseDefinition(JsonElement commodity)
     {
-        var parts = line.Split(',', 2, StringSplitOptions.TrimEntries);
-        if (parts.Length != 2 || string.IsNullOrWhiteSpace(parts[0]))
+        if (!IsRelevantMiningCommodity(commodity))
         {
             return null;
         }
 
-        var material = parts[0].Trim();
-        var category = parts[1].Trim();
+        var material = NormalizeDisplayName(commodity.GetProperty("name").GetString()!.Trim());
+        var category = commodity.TryGetProperty("kind", out var kindElement)
+            ? kindElement.GetString()?.Trim()
+            : null;
+
+        if (string.IsNullOrWhiteSpace(material))
+        {
+            return null;
+        }
+
         return new MineableDefinition(material, category, NormalizeKey(material));
+    }
+
+    private static bool IsRelevantMiningCommodity(JsonElement commodity)
+    {
+        if (!TryGetString(commodity, "name", out var name) || string.IsNullOrWhiteSpace(name))
+        {
+            return false;
+        }
+
+        return GetInt32(commodity, "is_available") == 1
+            && GetInt32(commodity, "is_visible") == 1
+            && GetInt32(commodity, "is_extractable") == 1;
+    }
+
+    private static bool TryGetString(JsonElement element, string propertyName, out string? value)
+    {
+        value = null;
+        if (!element.TryGetProperty(propertyName, out var property) || property.ValueKind != JsonValueKind.String)
+        {
+            return false;
+        }
+
+        value = property.GetString();
+        return true;
+    }
+
+    private static int GetInt32(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var property))
+        {
+            return 0;
+        }
+
+        if (property.ValueKind == JsonValueKind.Number && property.TryGetInt32(out var number))
+        {
+            return number;
+        }
+
+        if (property.ValueKind == JsonValueKind.String && int.TryParse(property.GetString(), out var parsed))
+        {
+            return parsed;
+        }
+
+        return 0;
+    }
+
+    private static string NormalizeDisplayName(string value)
+    {
+        var cleaned = Regex.Replace(value, "\\s+", " ").Trim();
+        return CanonicalNameOverrides.TryGetValue(cleaned, out var overrideName)
+            ? overrideName
+            : cleaned;
     }
 
     private static string NormalizeKey(string value)
@@ -209,5 +298,5 @@ internal static class MineableCatalog
         return previous[right.Length];
     }
 
-    private sealed record MineableDefinition(string Material, string Category, string Key);
+    private sealed record MineableDefinition(string Material, string? Category, string Key);
 }
