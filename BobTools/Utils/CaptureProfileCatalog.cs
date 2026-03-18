@@ -9,7 +9,7 @@ internal static class CaptureProfileCatalog
 
     public static IReadOnlyList<CaptureProfileOption> Options { get; } = new[]
     {
-        new CaptureProfileOption(Signature, "Signature"),
+        new CaptureProfileOption(Signature, "Scan"),
         new CaptureProfileOption(Mining, "Mining")
     };
 

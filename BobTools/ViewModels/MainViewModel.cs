@@ -27,8 +27,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly AppSettings _settings;
     private readonly CaptureOverlayWindow _captureOverlayWindow;
     private readonly DispatcherTimer _overlayRefreshTimer;
+    private readonly Channel<QueuedLiveScanCapture> _liveScanQueue = Channel.CreateUnbounded<QueuedLiveScanCapture>();
     private readonly Channel<QueuedLiveMiningCapture> _liveMiningQueue = Channel.CreateUnbounded<QueuedLiveMiningCapture>();
     private readonly CancellationTokenSource _liveMiningQueueCancellation = new();
+    private readonly Task _liveScanQueueTask;
     private readonly Task _liveMiningQueueTask;
 
     [ObservableProperty] private string status = "Ready.";
@@ -41,20 +43,23 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string lastUsedOcrMode = "Last OCR mode: none yet";
     [ObservableProperty] private string lastOcrSourceSummary = "OCR source: none yet";
     [ObservableProperty] private System.Windows.Media.Brush lastOcrSourceBrush = System.Windows.Media.Brushes.SlateGray;
-    [ObservableProperty] private string signatureResourceSummary = "Signature resource: none yet";
+    [ObservableProperty] private string signatureResourceSummary = "Scan resource: none yet";
     [ObservableProperty] private string miningRockSummary = "Rock scan: none yet";
     [ObservableProperty] private string currentSessionId = App.SessionId;
+    [ObservableProperty] private string liveScanQueueSummary = "No live scan captures yet.";
     [ObservableProperty] private string liveMiningQueueSummary = "No live mining captures yet.";
+    [ObservableProperty] private string selectedWorkflowMode = WorkflowModeCatalog.Scanning;
     [ObservableProperty] private string selectedCaptureProfile = CaptureProfileCatalog.Signature;
-    [ObservableProperty] private string hotkeyTargetSummary = "Alt+B target: Signature";
+    [ObservableProperty] private string hotkeyTargetSummary = "Alt+B target: Scan capture";
     [ObservableProperty] private string offlineSelectedCaptureProfile = CaptureProfileCatalog.Signature;
     [ObservableProperty] private ImageSource? offlinePreviewImage;
-    [ObservableProperty] private string offlineImagePath = "Drop an image here to test Signature or Mining OCR.";
+    [ObservableProperty] private string offlineImagePath = "Drop an image here to test Scan or Mining OCR.";
     [ObservableProperty] private string offlineImageInfo = "No image loaded.";
     [ObservableProperty] private string offlineResultText = string.Empty;
-    [ObservableProperty] private string offlineSignatureResourceSummary = "Signature resource: none yet";
+    [ObservableProperty] private string offlineSignatureResourceSummary = "Scan resource: none yet";
     [ObservableProperty] private string offlineMiningRockSummary = "Rock scan: none yet";
     [ObservableProperty] private string offlineSelectionModeSummary = "Selection mode: none";
+    [ObservableProperty] private int selectedMainTabIndex;
     [ObservableProperty] private double offlinePreviewWidth = 640;
     [ObservableProperty] private double offlinePreviewHeight = 280;
     [ObservableProperty] private double offlineSelectionLeft;
@@ -83,12 +88,17 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public IRelayCommand AddOfflineMiningRowCommand { get; }
     public IRelayCommand<OfflineMiningElementEditRow> DeleteOfflineMiningRowCommand { get; }
     public IReadOnlyList<OcrModeOption> OcrModeOptions { get; } = OcrModeCatalog.Options;
+    public IReadOnlyList<CaptureProfileOption> WorkflowModeOptions { get; } = WorkflowModeCatalog.Options;
     public IReadOnlyList<CaptureProfileOption> CaptureProfileOptions { get; } = CaptureProfileCatalog.Options;
     public ObservableCollection<OfflineInputImageItem> OfflineInputImages { get; } = new();
     public ObservableCollection<OfflineMiningResultItem> OfflineMiningResults { get; } = new();
+    public ObservableCollection<LiveScanResultItem> LiveScanResults { get; } = new();
     public ObservableCollection<OfflineMiningResultItem> LiveMiningResults { get; } = new();
 
     public bool IsOfflineMiningSelected => string.Equals(OfflineSelectedCaptureProfile, CaptureProfileCatalog.Mining, StringComparison.OrdinalIgnoreCase);
+    public bool IsScanningMode => string.Equals(SelectedWorkflowMode, WorkflowModeCatalog.Scanning, StringComparison.OrdinalIgnoreCase);
+    public bool IsMiningMode => string.Equals(SelectedWorkflowMode, WorkflowModeCatalog.Mining, StringComparison.OrdinalIgnoreCase);
+    public bool IsOfflineMode => string.Equals(SelectedWorkflowMode, WorkflowModeCatalog.Offline, StringComparison.OrdinalIgnoreCase);
 
     public MainViewModel(ISettingsService settingsService, IScreenCaptureService screenCaptureService, IOcrService ocrService)
     {
@@ -97,8 +107,34 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _ocrService = ocrService;
         _settings = _settingsService.Load();
         saveDebugImages = _settings.SaveDebugImages;
-        selectedOcrMode = OcrModeCatalog.IsValid(_settings.OcrMode) ? _settings.OcrMode : OcrModeCatalog.Auto;
-        selectedCaptureProfile = CaptureProfileCatalog.IsValid(_settings.ActiveCaptureProfile) ? _settings.ActiveCaptureProfile : CaptureProfileCatalog.Signature;
+        selectedOcrMode = OcrModeCatalog.Auto;
+        selectedWorkflowMode = WorkflowModeCatalog.Scanning;
+        selectedCaptureProfile = CaptureProfileCatalog.Signature;
+        var settingsChanged = false;
+
+        if (!string.Equals(_settings.OcrMode, OcrModeCatalog.Auto, StringComparison.OrdinalIgnoreCase))
+        {
+            _settings.OcrMode = OcrModeCatalog.Auto;
+            settingsChanged = true;
+        }
+
+        if (!string.Equals(_settings.ActiveWorkflowMode, WorkflowModeCatalog.Scanning, StringComparison.OrdinalIgnoreCase))
+        {
+            _settings.ActiveWorkflowMode = WorkflowModeCatalog.Scanning;
+            settingsChanged = true;
+        }
+
+        if (!string.Equals(_settings.ActiveCaptureProfile, CaptureProfileCatalog.Signature, StringComparison.OrdinalIgnoreCase))
+        {
+            _settings.ActiveCaptureProfile = CaptureProfileCatalog.Signature;
+            settingsChanged = true;
+        }
+
+        if (settingsChanged)
+        {
+            _settingsService.Save(_settings);
+        }
+
         _captureOverlayWindow = new CaptureOverlayWindow();
         _overlayRefreshTimer = new DispatcherTimer
         {
@@ -106,8 +142,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
         };
         _overlayRefreshTimer.Tick += OverlayRefreshTimer_Tick;
         _overlayRefreshTimer.Start();
+        _liveScanQueueTask = Task.Run(() => ProcessLiveScanQueueAsync(_liveMiningQueueCancellation.Token));
         _liveMiningQueueTask = Task.Run(() => ProcessLiveMiningQueueAsync(_liveMiningQueueCancellation.Token));
         UpdateCaptureRegionSummaries();
+        UpdateLiveScanQueueSummary();
         UpdateHotkeyTargetSummary();
         UpdateCaptureOverlay();
 
@@ -129,7 +167,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     public Task CaptureAndReviewAsync()
     {
-        return CaptureAndReviewAsync(SelectedCaptureProfile);
+        var captureProfile = WorkflowModeCatalog.GetCaptureProfile(SelectedWorkflowMode);
+        if (string.IsNullOrWhiteSpace(captureProfile))
+        {
+            Status = "Offline mode does not use Alt+B capture. Use Queue Folder to add mining images for processing.";
+            return Task.CompletedTask;
+        }
+
+        return CaptureAndReviewAsync(captureProfile);
     }
 
     private async Task CaptureAndReviewAsync(string captureProfile)
@@ -140,6 +185,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (!region.IsValid)
         {
             Status = $"Set the {GetCaptureProfileLabel(captureProfile)} region first.";
+            return;
+        }
+
+        if (string.Equals(captureProfile, CaptureProfileCatalog.Signature, StringComparison.OrdinalIgnoreCase)
+            && IsScanningMode)
+        {
+            await QueueLiveScanCaptureAsync(region, captureProfile);
             return;
         }
 
@@ -273,6 +325,36 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    private async Task QueueLiveScanCaptureAsync(CaptureRegion region, string captureProfile)
+    {
+        try
+        {
+            Status = "Capturing Scan region...";
+            _captureOverlayWindow.HideOverlay();
+
+            using Bitmap bitmap = _screenCaptureService.Capture(region);
+            var captureFolder = CreateLiveCaptureDirectory(captureProfile);
+            var rawImagePath = Path.Combine(captureFolder, "01_capture.png");
+            bitmap.Save(rawImagePath, System.Drawing.Imaging.ImageFormat.Png);
+
+            await EnqueueLiveScanImageAsync(rawImagePath, SaveDebugImages ? captureFolder : null, captureProfile, "Queued live scan for OCR...");
+
+            Status = $"Queued Scan capture for background OCR. Session: {CurrentSessionId}";
+        }
+        catch (OperationCanceledException)
+        {
+            Status = "Scan queue is shutting down.";
+        }
+        catch (Exception ex)
+        {
+            Status = $"Error queuing scan capture: {ex.Message}";
+        }
+        finally
+        {
+            UpdateCaptureOverlay();
+        }
+    }
+
     private async Task LoadLiveMiningFolderAsync()
     {
         using var dialog = new WinForms.FolderBrowserDialog
@@ -351,6 +433,22 @@ public partial class MainViewModel : ObservableObject, IDisposable
             _liveMiningQueueCancellation.Token);
     }
 
+    private async Task EnqueueLiveScanImageAsync(string sourceImagePath, string? debugOutputDirectory, string captureProfile, string processingState)
+    {
+        var resultItem = new LiveScanResultItem(
+            sourceImagePath,
+            sourceImagePath,
+            processingState,
+            true);
+
+        LiveScanResults.Insert(0, resultItem);
+        UpdateLiveScanQueueSummary();
+
+        await _liveScanQueue.Writer.WriteAsync(
+            new QueuedLiveScanCapture(sourceImagePath, debugOutputDirectory, SelectedOcrMode, captureProfile, resultItem),
+            _liveMiningQueueCancellation.Token);
+    }
+
     private void SelectRegion(string captureProfile)
     {
         SelectedCaptureProfile = captureProfile;
@@ -412,9 +510,37 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     partial void OnSelectedOcrModeChanged(string value)
     {
-        _settings.OcrMode = OcrModeCatalog.IsValid(value) ? value : OcrModeCatalog.Auto;
+        _settings.OcrMode = OcrModeCatalog.Auto;
         _settingsService.Save(_settings);
-        Status = $"OCR mode set to {OcrModeOptions.First(option => option.Value == _settings.OcrMode).DisplayName}.";
+        if (!string.Equals(value, OcrModeCatalog.Auto, StringComparison.OrdinalIgnoreCase))
+        {
+            SelectedOcrMode = OcrModeCatalog.Auto;
+        }
+    }
+
+    partial void OnSelectedWorkflowModeChanged(string value)
+    {
+        if (!WorkflowModeCatalog.IsValid(value))
+        {
+            SelectedWorkflowMode = WorkflowModeCatalog.Scanning;
+            return;
+        }
+
+        _settings.ActiveWorkflowMode = value;
+        _settingsService.Save(_settings);
+
+        var captureProfile = WorkflowModeCatalog.GetCaptureProfile(value);
+        if (!string.IsNullOrWhiteSpace(captureProfile) && !string.Equals(SelectedCaptureProfile, captureProfile, StringComparison.OrdinalIgnoreCase))
+        {
+            SelectedCaptureProfile = captureProfile;
+        }
+
+        OnPropertyChanged(nameof(IsScanningMode));
+        OnPropertyChanged(nameof(IsMiningMode));
+        OnPropertyChanged(nameof(IsOfflineMode));
+        SelectedMainTabIndex = string.Equals(value, WorkflowModeCatalog.Offline, StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+        UpdateHotkeyTargetSummary();
+        UpdateCaptureOverlay();
     }
 
     partial void OnSelectedCaptureProfileChanged(string value)
@@ -564,7 +690,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
 
         OfflineResultText = string.Empty;
-        OfflineSignatureResourceSummary = "Signature resource: none yet";
+        OfflineSignatureResourceSummary = "Scan resource: none yet";
         OfflineMiningRockSummary = "Rock scan: none yet";
         if (SelectedOfflineInputImage is null)
         {
@@ -592,7 +718,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             _offlineImagePixelWidth = 0;
             _offlineImagePixelHeight = 0;
             OfflinePreviewImage = null;
-            OfflineImagePath = "Drop an image here to test Signature or Mining OCR.";
+            OfflineImagePath = "Drop an image here to test Scan or Mining OCR.";
             OfflineImageInfo = "No image loaded.";
             return;
         }
@@ -748,7 +874,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
 
         SelectedOfflineMiningResult = OfflineMiningResults.FirstOrDefault();
-        OfflineSignatureResourceSummary = "Signature resource: n/a for Mining";
+        OfflineSignatureResourceSummary = "Scan resource: n/a for Mining";
 
         Status = processedCount == 0
             ? "No offline mining images were processed."
@@ -911,7 +1037,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void UpdateCaptureOverlay()
     {
-        var activeRegion = GetCaptureRegion(SelectedCaptureProfile);
+        var activeCaptureProfile = WorkflowModeCatalog.GetCaptureProfile(SelectedWorkflowMode);
+        if (string.IsNullOrWhiteSpace(activeCaptureProfile))
+        {
+            _captureOverlayWindow.HideOverlay();
+            return;
+        }
+
+        var activeRegion = GetCaptureRegion(activeCaptureProfile);
         if (activeRegion.IsValid)
         {
             _captureOverlayWindow.SetRegion(activeRegion);
@@ -923,7 +1056,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void UpdateHotkeyTargetSummary()
     {
-        HotkeyTargetSummary = $"Alt+B target: {GetCaptureProfileLabel(SelectedCaptureProfile)}";
+        HotkeyTargetSummary = SelectedWorkflowMode switch
+        {
+            WorkflowModeCatalog.Scanning => "Alt+B target: Scan capture",
+            WorkflowModeCatalog.Mining => "Alt+B target: Mining queue",
+            WorkflowModeCatalog.Offline => "Alt+B disabled in Offline mode",
+            _ => "Alt+B target: unknown"
+        };
     }
 
     private void UpdateOfflineSelectionPreview()
@@ -1003,15 +1142,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private static string BuildSignatureResourceSummary(string? captureProfile, string? normalizedText)
     {
         return string.Equals(captureProfile, CaptureProfileCatalog.Signature, StringComparison.OrdinalIgnoreCase)
-            ? SignatureCatalog.BuildResourceSummary(normalizedText)
-            : "Signature resource: n/a for Mining";
+            ? SignatureCatalog.BuildResourceSummary(normalizedText).Replace("Signature resource:", "Scan resource:", StringComparison.Ordinal)
+            : "Scan resource: n/a for Mining";
     }
 
     private static string BuildMiningRockSummary(string? captureProfile, string? normalizedText)
     {
         if (!string.Equals(captureProfile, CaptureProfileCatalog.Mining, StringComparison.OrdinalIgnoreCase))
         {
-            return "Rock scan: n/a for Signature";
+            return "Rock scan: n/a for Scan";
         }
 
         return RockScanParser.TryParse(normalizedText, out var rockScan)
@@ -1066,6 +1205,55 @@ public partial class MainViewModel : ObservableObject, IDisposable
         return BuildMiningScan(normalizedText, baseScan);
     }
 
+    private async Task ProcessLiveScanQueueAsync(CancellationToken cancellationToken)
+    {
+        await foreach (var queuedCapture in _liveScanQueue.Reader.ReadAllAsync(cancellationToken))
+        {
+            try
+            {
+                queuedCapture.ResultItem.SetProcessingState("Processing OCR...", true);
+
+                using var bitmap = new Bitmap(queuedCapture.SourceImagePath);
+                var ocrResult = await _ocrService.ExtractTextAsync(bitmap, queuedCapture.DebugOutputDirectory, queuedCapture.RequestedOcrMode, queuedCapture.CaptureProfile);
+                var signatureSummary = BuildSignatureResourceSummary(queuedCapture.CaptureProfile, ocrResult.NormalizedText);
+                var sourceSummary = GetOcrSourceSummary(ocrResult.UsedMode, queuedCapture.CaptureProfile);
+                var processedImagePath = ResolveProcessedImagePath(queuedCapture.DebugOutputDirectory, ocrResult.UsedMode) ?? queuedCapture.SourceImagePath;
+
+                await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    LastExtractedText = ocrResult.NormalizedText;
+                    AcceptedText = ocrResult.NormalizedText;
+                    LastUsedOcrMode = $"Last OCR mode: {OcrModeCatalog.GetDisplayName(ocrResult.UsedMode)}";
+                    LastOcrSourceSummary = sourceSummary;
+                    SignatureResourceSummary = signatureSummary;
+                    MiningRockSummary = "Rock scan: n/a for Scan";
+                    queuedCapture.ResultItem.ApplyProcessedResult(
+                        ocrResult.NormalizedText,
+                        signatureSummary,
+                        OcrModeCatalog.GetDisplayName(ocrResult.UsedMode),
+                        sourceSummary,
+                        processedImagePath,
+                        "Processed");
+                    UpdateLiveScanQueueSummary();
+                    Status = $"Processed live scan capture {queuedCapture.ResultItem.DisplayName}.";
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    queuedCapture.ResultItem.ApplyProcessingFailure($"Failed: {ex.Message}");
+                    UpdateLiveScanQueueSummary();
+                    Status = $"Live scan OCR failed for {queuedCapture.ResultItem.DisplayName}: {ex.Message}";
+                });
+            }
+        }
+    }
+
     private async Task ProcessLiveMiningQueueAsync(CancellationToken cancellationToken)
     {
         await foreach (var queuedCapture in _liveMiningQueue.Reader.ReadAllAsync(cancellationToken))
@@ -1088,7 +1276,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                     AcceptedText = ocrResult.NormalizedText;
                     LastUsedOcrMode = $"Last OCR mode: {OcrModeCatalog.GetDisplayName(ocrResult.UsedMode)}";
                     LastOcrSourceSummary = GetOcrSourceSummary(ocrResult.UsedMode, CaptureProfileCatalog.Mining);
-                    SignatureResourceSummary = "Signature resource: n/a for Mining";
+                    SignatureResourceSummary = "Scan resource: n/a for Mining";
                     MiningRockSummary = summary;
                     queuedCapture.ResultItem.ApplyProcessedResult(completedScan, summary, processedImagePath, persistedJsonPath, persistedCsvPath, "Processed");
                     UpdateLiveMiningQueueSummary();
@@ -1138,6 +1326,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
             : $"Session {CurrentSessionId} | Captures: {LiveMiningResults.Count} | Active jobs: {processingCount}";
     }
 
+    private void UpdateLiveScanQueueSummary()
+    {
+        var processingCount = LiveScanResults.Count(item => item.IsProcessing);
+        LiveScanQueueSummary = LiveScanResults.Count == 0
+            ? "No live scan captures yet."
+            : $"Session {CurrentSessionId} | Captures: {LiveScanResults.Count} | Active jobs: {processingCount}";
+    }
+
     private static string CreateLiveCaptureDirectory(string captureProfile)
     {
         var root = Path.Combine(
@@ -1162,6 +1358,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             var capturePath = Path.Combine(debugOutputDirectory, "01_capture.png");
             return File.Exists(capturePath) ? capturePath : null;
+        }
+
+        if (usedMode.StartsWith("signature-icon-value|", StringComparison.OrdinalIgnoreCase))
+        {
+            var signatureValuePath = Path.Combine(debugOutputDirectory, "00_signature_value_region.png");
+            if (File.Exists(signatureValuePath))
+            {
+                return signatureValuePath;
+            }
         }
 
         var normalizedMode = usedMode.Contains('|', StringComparison.Ordinal)
@@ -1223,7 +1428,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         if (!string.Equals(captureProfile, CaptureProfileCatalog.Mining, StringComparison.OrdinalIgnoreCase))
         {
-            return ("Rock scan: n/a for Signature", null, null);
+            return ("Rock scan: n/a for Scan", null, null);
         }
 
         if (!RockScanParser.TryParse(normalizedText, out var rockScan))
@@ -1251,12 +1456,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         if (usedMode?.StartsWith("signature-icon-value|", StringComparison.OrdinalIgnoreCase) == true)
         {
-            return "OCR source: Signature icon-guided crop";
+            return "OCR source: Scan icon-guided crop";
         }
 
         if (string.Equals(captureProfile, CaptureProfileCatalog.Signature, StringComparison.OrdinalIgnoreCase))
         {
-            return "OCR source: Signature fallback OCR";
+            return "OCR source: Scan fallback OCR";
         }
 
         return "OCR source: Standard OCR";
@@ -1304,11 +1509,19 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         _liveMiningQueueCancellation.Cancel();
+        _liveScanQueue.Writer.TryComplete();
         _liveMiningQueue.Writer.TryComplete();
         _overlayRefreshTimer.Stop();
         _overlayRefreshTimer.Tick -= OverlayRefreshTimer_Tick;
         _captureOverlayWindow.Close();
     }
+
+    private sealed record QueuedLiveScanCapture(
+        string SourceImagePath,
+        string? DebugOutputDirectory,
+        string RequestedOcrMode,
+        string CaptureProfile,
+        LiveScanResultItem ResultItem);
 
     private sealed record QueuedLiveMiningCapture(
         string SourceImagePath,

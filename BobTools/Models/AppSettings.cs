@@ -10,4 +10,5 @@ public sealed class AppSettings
     public bool SaveDebugImages { get; set; }
     public string OcrMode { get; set; } = "auto";
     public string ActiveCaptureProfile { get; set; } = "signature";
+    public string ActiveWorkflowMode { get; set; } = "scanning";
 }

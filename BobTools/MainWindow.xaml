@@ -40,9 +40,16 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <StackPanel VerticalAlignment="Center">
-                    <TextBlock FontSize="22" FontWeight="Bold" Foreground="White" Text="BobTools" />
-                    <TextBlock Margin="0,2,0,0" Foreground="#BBD5E1" Text="Top overlay — drag frame to reposition." />
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                              <Image Width="92"
+                                  Height="92"
+                                  Margin="0,0,8,0"
+                           Stretch="Uniform"
+                           Source="pack://siteoforigin:,,,/Assets/images/BOBSL_logo_blue.png" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock FontSize="22" FontWeight="Bold" Foreground="White" Text="BobTools" />
+                        <TextBlock Margin="0,2,0,0" Foreground="#BBD5E1" Text="Top overlay — drag frame to reposition." />
+                    </StackPanel>
                 </StackPanel>
 
                 <Border Grid.Column="2" Padding="10" CornerRadius="8" Background="#8A0F172A" BorderBrush="#334155" BorderThickness="1">
@@ -57,23 +64,25 @@
 
                         <StackPanel>
                             <TextBlock FontWeight="Bold" Foreground="White" Text="Capture" />
-                            <TextBlock Margin="0,4,0,0" Foreground="#D1D5DB" Text="{Binding SignatureCaptureRegionSummary, StringFormat=Signature: {0}}" />
+                            <TextBlock Margin="0,4,0,0" Foreground="#D1D5DB" Text="{Binding SignatureCaptureRegionSummary, StringFormat=Scan: {0}}" />
                             <TextBlock Margin="0,2,0,0" Foreground="#D1D5DB" Text="{Binding MiningCaptureRegionSummary, StringFormat=Mining: {0}}" />
                         </StackPanel>
 
                         <StackPanel Grid.Column="2" VerticalAlignment="Center">
                             <WrapPanel Margin="0,0,0,10">
                                 <Button Style="{StaticResource ImageToolbarButtonStyle}"
-                                        ToolTip="Set Signature area"
-                                        Command="{Binding SelectSignatureRegionCommand}">
+                                    ToolTip="Set Scan area"
+                                    Command="{Binding SelectSignatureRegionCommand}"
+                                    Visibility="{Binding IsScanningMode, Converter={StaticResource BooleanToVisibilityConverter}}">
                                     <Image Width="50"
                                            Height="50"
                                            Stretch="Uniform"
                                            Source="pack://siteoforigin:,,,/Assets/images/btn_set_scan.png" />
                                 </Button>
                                 <Button Style="{StaticResource ImageToolbarButtonStyle}"
-                                        ToolTip="Capture Signature"
-                                        Command="{Binding CaptureSignatureCommand}">
+                                    ToolTip="Capture Scan"
+                                    Command="{Binding CaptureSignatureCommand}"
+                                    Visibility="{Binding IsScanningMode, Converter={StaticResource BooleanToVisibilityConverter}}">
                                     <Image Width="50"
                                            Height="50"
                                            Stretch="Uniform"
@@ -81,7 +90,8 @@
                                 </Button>
                                 <Button Style="{StaticResource ImageToolbarButtonStyle}"
                                         ToolTip="Set Mining area"
-                                        Command="{Binding SelectMiningRegionCommand}">
+                                    Command="{Binding SelectMiningRegionCommand}"
+                                    Visibility="{Binding IsMiningMode, Converter={StaticResource BooleanToVisibilityConverter}}">
                                     <Image Width="50"
                                            Height="50"
                                            Stretch="Uniform"
@@ -89,7 +99,8 @@
                                 </Button>
                                 <Button Style="{StaticResource ImageToolbarButtonStyle}"
                                         ToolTip="Capture Mining"
-                                        Command="{Binding CaptureMiningCommand}">
+                                    Command="{Binding CaptureMiningCommand}"
+                                    Visibility="{Binding IsMiningMode, Converter={StaticResource BooleanToVisibilityConverter}}">
                                     <Image Width="50"
                                            Height="50"
                                            Stretch="Uniform"
@@ -97,7 +108,8 @@
                                 </Button>
                                 <Button Style="{StaticResource ImageToolbarButtonStyle}"
                                         ToolTip="Queue Folder"
-                                        Command="{Binding LoadLiveMiningFolderCommand}">
+                                    Command="{Binding LoadLiveMiningFolderCommand}"
+                                    Visibility="{Binding IsOfflineMode, Converter={StaticResource BooleanToVisibilityConverter}}">
                                     <Image Width="50"
                                            Height="50"
                                            Stretch="Uniform"
@@ -117,15 +129,10 @@
 
                             <WrapPanel VerticalAlignment="Center">
                                 <ComboBox Width="148" Height="30" Margin="0,0,10,0"
-                                          ItemsSource="{Binding CaptureProfileOptions}"
+                                          ItemsSource="{Binding WorkflowModeOptions}"
                                           DisplayMemberPath="DisplayName"
                                           SelectedValuePath="Value"
-                                          SelectedValue="{Binding SelectedCaptureProfile}" />
-                                <ComboBox Width="208" Height="30" Margin="0,0,10,0"
-                                          ItemsSource="{Binding OcrModeOptions}"
-                                          DisplayMemberPath="DisplayName"
-                                          SelectedValuePath="Value"
-                                          SelectedValue="{Binding SelectedOcrMode}" />
+                                          SelectedValue="{Binding SelectedWorkflowMode}" />
                                 <CheckBox Margin="0,6,0,0"
                                           VerticalAlignment="Center"
                                           Foreground="White"
@@ -148,7 +155,8 @@
                 </StackPanel>
             </Grid>
 
-            <TabControl Grid.Row="1" Margin="0,10,0,0" Background="#6B0F172A" BorderBrush="#334155" Foreground="White">
+            <TabControl Grid.Row="1" Margin="0,10,0,0" Background="#6B0F172A" BorderBrush="#334155" Foreground="White"
+                        SelectedIndex="{Binding SelectedMainTabIndex, Mode=TwoWay}">
                 <TabItem Header="Live Results">
                     <Grid Margin="10">
                         <Grid.RowDefinitions>
@@ -157,17 +165,124 @@
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
 
-                        <StackPanel Grid.Row="0" Margin="0,0,0,4">
-                            <TextBlock Foreground="#A7F3D0" FontWeight="SemiBold" Text="{Binding SignatureResourceSummary}" />
-                            <TextBlock Margin="0,2,0,0" Foreground="#93C5FD" FontWeight="SemiBold" Text="{Binding MiningRockSummary}" TextWrapping="Wrap" />
-                            <TextBlock Margin="0,8,0,0" Foreground="#E5E7EB" Text="{Binding LiveMiningQueueSummary}" TextWrapping="Wrap" />
-                            <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" Text="{Binding CurrentSessionId, StringFormat=Session: {0}}" TextWrapping="Wrap" />
-                        </StackPanel>
+                        <Grid Grid.Row="0" Margin="0,0,0,4">
+                            <Grid.Style>
+                                <Style TargetType="Grid">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </Style>
+                            </Grid.Style>
+                            <StackPanel>
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsScanningMode}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Foreground="#A7F3D0" FontWeight="SemiBold" Text="{Binding SignatureResourceSummary}" TextWrapping="Wrap" />
+                                <TextBlock Margin="0,8,0,0" Foreground="#E5E7EB" Text="{Binding LiveScanQueueSummary}" TextWrapping="Wrap" />
+                                <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" Text="{Binding CurrentSessionId, StringFormat=Session: {0}}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel>
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsMiningMode}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+                                <TextBlock Margin="0,2,0,0" Foreground="#93C5FD" FontWeight="SemiBold" Text="{Binding MiningRockSummary}" TextWrapping="Wrap" />
+                                <TextBlock Margin="0,8,0,0" Foreground="#E5E7EB" Text="{Binding LiveMiningQueueSummary}" TextWrapping="Wrap" />
+                                <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" Text="{Binding CurrentSessionId, StringFormat=Session: {0}}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <TextBlock Foreground="#94A3B8" TextWrapping="Wrap" Text="Offline mode uses queued folder import only.">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsOfflineMode}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
 
                         <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
-                            <StackPanel>
-                                <TextBlock Margin="0,0,0,10" Foreground="#94A3B8" Text="Mining captures are queued immediately and processed in the background. Newest captures appear first." TextWrapping="Wrap" />
-                                <ItemsControl ItemsSource="{Binding LiveMiningResults}">
+                            <Grid>
+                                <StackPanel>
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsScanningMode}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <TextBlock Margin="0,0,0,10" Foreground="#94A3B8" Text="Scan captures are queued and processed in the background. Newest captures appear first." TextWrapping="Wrap" />
+                                    <ItemsControl ItemsSource="{Binding LiveScanResults}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border Margin="0,0,0,12" Padding="12" CornerRadius="10" Background="#8A0F172A" BorderBrush="#334155" BorderThickness="1">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="260" />
+                                                            <ColumnDefinition Width="12" />
+                                                            <ColumnDefinition Width="*" />
+                                                        </Grid.ColumnDefinitions>
+
+                                                        <StackPanel>
+                                                            <TextBlock Foreground="White" FontWeight="SemiBold" Text="{Binding DisplayName}" TextWrapping="Wrap" />
+                                                            <TextBlock Margin="0,4,0,0" Foreground="#93C5FD" Text="{Binding ProcessingState}" TextWrapping="Wrap" />
+                                                            <Border Margin="0,10,0,0" Background="#0F172A" BorderBrush="#334155" BorderThickness="1" CornerRadius="6" Height="170">
+                                                                <Image Source="{Binding ProcessedPreviewImage}" Stretch="Uniform" />
+                                                            </Border>
+                                                        </StackPanel>
+
+                                                        <StackPanel Grid.Column="2">
+                                                            <TextBlock Foreground="#A7F3D0" FontWeight="SemiBold" Text="{Binding SignatureResourceSummary}" TextWrapping="Wrap" />
+                                                            <TextBlock Margin="0,4,0,0" Foreground="#94A3B8" Text="{Binding OcrSourceSummary}" TextWrapping="Wrap" />
+                                                            <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" Text="{Binding UsedOcrModeSummary, StringFormat=OCR Mode: {0}}" TextWrapping="Wrap" />
+                                                            <TextBox Margin="0,10,0,0"
+                                                                     MinHeight="170"
+                                                                     Text="{Binding OcrText}"
+                                                                     AcceptsReturn="True"
+                                                                     TextWrapping="Wrap"
+                                                                     VerticalScrollBarVisibility="Auto"
+                                                                     IsReadOnly="True"
+                                                                     Background="#0F172A"
+                                                                     Foreground="#E5E7EB"
+                                                                     BorderBrush="#334155" />
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+
+                                <StackPanel>
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsMiningMode}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <TextBlock Margin="0,0,0,10" Foreground="#94A3B8" Text="Mining captures are queued immediately and processed in the background. Newest captures appear first." TextWrapping="Wrap" />
+                                    <ItemsControl ItemsSource="{Binding LiveMiningResults}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <Border Margin="0,0,0,12" Padding="12" CornerRadius="10" Background="#8A0F172A" BorderBrush="#334155" BorderThickness="1">
@@ -310,12 +425,27 @@
                                             </Border>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
+                                    </ItemsControl>
+                                </StackPanel>
+
+                                <TextBlock Foreground="#94A3B8" TextWrapping="Wrap" Text="Offline mode does not create live capture history entries. Use Queue Folder to import mining screenshots.">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsOfflineMode}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
                         </ScrollViewer>
                     </Grid>
                 </TabItem>
-                <TabItem Header="Offline Test">
+                <TabItem Header="Offline Test"
+                         Visibility="{Binding IsOfflineMode, Converter={StaticResource BooleanToVisibilityConverter}}">
                     <Grid Margin="10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="2*" />
@@ -341,7 +471,7 @@
                                     Command="{Binding SaveOfflineMiningEditsCommand}"
                                     Style="{StaticResource DirtyAwareSaveButtonStyle}"
                                     Tag="{Binding SelectedOfflineMiningResult.IsDirty}" />
-                            <TextBlock VerticalAlignment="Center" Foreground="#94A3B8" Text="Drop one or more screenshots or pre-cropped captures like 01_capture.png; if the saved box does not fit, OCR uses the whole dropped image." />
+                            <TextBlock VerticalAlignment="Center" Foreground="#94A3B8" Text="Drop one or more screenshots or pre-cropped captures like 01_capture.png; if the saved box does not fit, OCR uses the whole dropped image for Scan or Mining." />
                         </WrapPanel>
 
                         <Border Grid.Row="1" Grid.Column="0" Padding="12" CornerRadius="10" Background="#8A0F172A" BorderBrush="#334155" BorderThickness="1"

@@ -50,6 +50,13 @@ public sealed class SettingsService : ISettingsService
             settings.ActiveCaptureProfile = CaptureProfileCatalog.Signature;
         }
 
+        if (!WorkflowModeCatalog.IsValid(settings.ActiveWorkflowMode))
+        {
+            settings.ActiveWorkflowMode = string.Equals(settings.ActiveCaptureProfile, CaptureProfileCatalog.Mining, StringComparison.OrdinalIgnoreCase)
+                ? WorkflowModeCatalog.Mining
+                : WorkflowModeCatalog.Scanning;
+        }
+
         return settings;
     }
 
