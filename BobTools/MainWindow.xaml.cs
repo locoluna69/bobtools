@@ -25,11 +25,14 @@ public partial class MainWindow : Window
         MigrateLegacySettings(localAppData, settingsPath);
 
         var settingsService = new SettingsService(settingsPath);
+        var sessionHistoryService = new SessionHistoryService(Path.Combine(appData, "Sessions"), App.SessionId);
+        sessionHistoryService.Initialize();
 
         _hotkeyService = new HotkeyService();
         _settings = settingsService.Load();
         _viewModel = new MainViewModel(
             settingsService,
+            sessionHistoryService,
             new ScreenCaptureService(),
             new OcrService(tessDataPath));
 

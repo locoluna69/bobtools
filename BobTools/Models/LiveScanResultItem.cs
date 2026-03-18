@@ -17,6 +17,8 @@ public sealed partial class LiveScanResultItem : ObservableObject
         this.isProcessing = isProcessing;
     }
 
+    public string HistoryEntryId { get; } = Guid.NewGuid().ToString();
+
     public string DisplayName { get; }
 
     public string SourceImagePath { get; }
@@ -29,6 +31,8 @@ public sealed partial class LiveScanResultItem : ObservableObject
     [ObservableProperty] private string signatureResourceSummary = "Scan resource: none yet";
     [ObservableProperty] private string usedOcrModeSummary = string.Empty;
     [ObservableProperty] private string ocrSourceSummary = string.Empty;
+    [ObservableProperty] private string? matchedResourceName;
+    [ObservableProperty] private bool isTargetMatch;
 
     public void SetProcessingState(string state, bool value)
     {
@@ -41,6 +45,8 @@ public sealed partial class LiveScanResultItem : ObservableObject
         string signatureSummary,
         string usedModeSummary,
         string sourceSummary,
+        string? matchedResource,
+        bool isMatchingTarget,
         string? processedImageFilePath,
         string processingState)
     {
@@ -48,6 +54,8 @@ public sealed partial class LiveScanResultItem : ObservableObject
         SignatureResourceSummary = signatureSummary;
         UsedOcrModeSummary = usedModeSummary;
         OcrSourceSummary = sourceSummary;
+        MatchedResourceName = matchedResource;
+        IsTargetMatch = isMatchingTarget;
         ProcessedImagePath = processedImageFilePath;
         ProcessedPreviewImage = LoadImage(processedImageFilePath);
         ProcessingState = processingState;
@@ -58,6 +66,25 @@ public sealed partial class LiveScanResultItem : ObservableObject
     {
         ProcessingState = processingState;
         IsProcessing = false;
+    }
+
+    public void ApplyTargetMatchState(bool isMatchingTarget)
+    {
+        IsTargetMatch = isMatchingTarget;
+    }
+
+    public string TargetAlertSummary => IsTargetMatch && !string.IsNullOrWhiteSpace(MatchedResourceName)
+        ? $"Target match: {MatchedResourceName}"
+        : string.Empty;
+
+    partial void OnMatchedResourceNameChanged(string? value)
+    {
+        OnPropertyChanged(nameof(TargetAlertSummary));
+    }
+
+    partial void OnIsTargetMatchChanged(bool value)
+    {
+        OnPropertyChanged(nameof(TargetAlertSummary));
     }
 
     private static ImageSource? LoadImage(string? path)

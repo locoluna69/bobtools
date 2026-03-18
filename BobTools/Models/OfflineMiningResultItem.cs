@@ -15,6 +15,7 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
 {
     private string _savedSnapshot = string.Empty;
     private readonly Action<string>? _statusCallback;
+    private readonly Action<OfflineMiningResultItem>? _persistCallback;
     private bool _suppressDirtyTracking;
 
     public OfflineMiningResultItem(
@@ -25,12 +26,14 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
         string? jsonPath,
         string? csvPath,
         Action<string>? statusCallback = null,
+        Action<OfflineMiningResultItem>? persistCallback = null,
         string processingState = "Ready",
         bool isProcessing = false)
     {
         SourceImagePath = sourceImagePath;
         DisplayName = Path.GetFileName(sourceImagePath);
         _statusCallback = statusCallback;
+        _persistCallback = persistCallback;
         ExtractedScan = extractedScan;
         this.processedImagePath = processedImagePath;
         this.processedPreviewImage = LoadImage(processedImagePath);
@@ -74,6 +77,8 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
     [ObservableProperty] private bool isDirty;
     [ObservableProperty] private string processingState = string.Empty;
     [ObservableProperty] private bool isProcessing;
+    [ObservableProperty] private string usedOcrModeSummary = string.Empty;
+    [ObservableProperty] private string ocrSourceSummary = string.Empty;
 
     public RockScan BuildUpdatedScan()
     {
@@ -113,13 +118,15 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
         IsProcessing = value;
     }
 
-    public void ApplyProcessedResult(RockScan processedScan, string processedSummary, string? processedImageFilePath, string? savedJsonPath, string? savedCsvPath, string processingState)
+    public void ApplyProcessedResult(RockScan processedScan, string processedSummary, string usedOcrModeSummary, string ocrSourceSummary, string? processedImageFilePath, string? savedJsonPath, string? savedCsvPath, string processingState)
     {
         ExtractedScan = processedScan;
         ProcessedImagePath = processedImageFilePath;
         ProcessedPreviewImage = LoadImage(processedImageFilePath);
         LoadEditableValues(processedScan);
         Summary = processedSummary;
+        UsedOcrModeSummary = usedOcrModeSummary;
+        OcrSourceSummary = ocrSourceSummary;
         JsonPath = savedJsonPath;
         CsvPath = savedCsvPath;
         ProcessingState = processingState;
@@ -276,6 +283,7 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
 
             MarkSaved(updatedScan.Scan, updatedScan.JsonPath, updatedScan.CsvPath);
             ProcessingState = "Saved";
+            _persistCallback?.Invoke(this);
             _statusCallback?.Invoke($"Saved updated mining data to {updatedScan.JsonPath} and synchronized {updatedScan.CsvPath}.");
         }
         catch (Exception ex)

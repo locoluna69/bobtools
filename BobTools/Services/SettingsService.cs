@@ -57,6 +57,8 @@ public sealed class SettingsService : ISettingsService
                 : WorkflowModeCatalog.Scanning;
         }
 
+        settings.SelectedScanResources ??= [];
+
         return settings;
     }
 

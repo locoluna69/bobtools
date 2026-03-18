@@ -11,4 +11,5 @@ public sealed class AppSettings
     public string OcrMode { get; set; } = "auto";
     public string ActiveCaptureProfile { get; set; } = "signature";
     public string ActiveWorkflowMode { get; set; } = "scanning";
+    public List<string> SelectedScanResources { get; set; } = [];
 }

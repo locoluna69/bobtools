@@ -183,6 +183,60 @@
                                     </Style>
                                 </StackPanel.Style>
                                 <TextBlock Foreground="#A7F3D0" FontWeight="SemiBold" Text="{Binding SignatureResourceSummary}" TextWrapping="Wrap" />
+                                <StackPanel Margin="0,8,0,0">
+                                    <ToggleButton x:Name="ScanTargetSelectorButton"
+                                                  Width="260"
+                                                  HorizontalAlignment="Left"
+                                                  Padding="10,6"
+                                                  Background="#0F172A"
+                                                  BorderBrush="#475569"
+                                                  Foreground="#E5E7EB"
+                                                  IsChecked="{Binding IsScanTargetSelectorOpen, Mode=TwoWay}"
+                                                  Content="{Binding SelectedScanTargetsSummary}" />
+                                    <Popup PlacementTarget="{Binding ElementName=ScanTargetSelectorButton}"
+                                           Placement="Bottom"
+                                           StaysOpen="False"
+                                           IsOpen="{Binding IsScanTargetSelectorOpen, Mode=TwoWay}">
+                                        <Border Margin="0,6,0,0"
+                                                Padding="12"
+                                                Width="320"
+                                                MaxHeight="320"
+                                                CornerRadius="10"
+                                                Background="#E6111827"
+                                                BorderBrush="#F59E0B"
+                                                BorderThickness="1">
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="*" />
+                                                </Grid.RowDefinitions>
+
+                                                <TextBlock Foreground="White" FontWeight="SemiBold" Text="Highlight matching scan resources" />
+                                                <WrapPanel Grid.Row="1" Margin="0,8,0,8">
+                                                    <Button Width="80" Margin="0,0,8,0" Content="Select All" Command="{Binding SelectAllScanTargetsCommand}" />
+                                                    <Button Width="80" Content="Clear" Command="{Binding ClearScanTargetsCommand}" />
+                                                </WrapPanel>
+                                                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                                                    <ItemsControl ItemsSource="{Binding ScanTargetOptions}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <CheckBox Margin="0,0,0,6"
+                                                                          Foreground="#E5E7EB"
+                                                                          Content="{Binding Resource}"
+                                                                          IsChecked="{Binding IsSelected, Mode=TwoWay}" />
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </ScrollViewer>
+                                            </Grid>
+                                        </Border>
+                                    </Popup>
+                                    <TextBlock Margin="0,6,0,0"
+                                               Foreground="#94A3B8"
+                                               Text="Checked resources are highlighted in the live queue when OCR matches them."
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
                                 <TextBlock Margin="0,8,0,0" Foreground="#E5E7EB" Text="{Binding LiveScanQueueSummary}" TextWrapping="Wrap" />
                                 <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" Text="{Binding CurrentSessionId, StringFormat=Session: {0}}" TextWrapping="Wrap" />
                             </StackPanel>
@@ -233,6 +287,20 @@
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Border Margin="0,0,0,12" Padding="12" CornerRadius="10" Background="#8A0F172A" BorderBrush="#334155" BorderThickness="1">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background" Value="#8A0F172A" />
+                                                            <Setter Property="BorderBrush" Value="#334155" />
+                                                            <Setter Property="BorderThickness" Value="1" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsTargetMatch}" Value="True">
+                                                                    <Setter Property="Background" Value="#3F3A2200" />
+                                                                    <Setter Property="BorderBrush" Value="#F59E0B" />
+                                                                    <Setter Property="BorderThickness" Value="2" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
                                                     <Grid>
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="260" />
@@ -249,6 +317,18 @@
                                                         </StackPanel>
 
                                                         <StackPanel Grid.Column="2">
+                                                            <TextBlock Foreground="#FCD34D" FontWeight="Bold" Text="{Binding TargetAlertSummary}" TextWrapping="Wrap">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock">
+                                                                        <Setter Property="Visibility" Value="Collapsed" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsTargetMatch}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Visible" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
                                                             <TextBlock Foreground="#A7F3D0" FontWeight="SemiBold" Text="{Binding SignatureResourceSummary}" TextWrapping="Wrap" />
                                                             <TextBlock Margin="0,4,0,0" Foreground="#94A3B8" Text="{Binding OcrSourceSummary}" TextWrapping="Wrap" />
                                                             <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" Text="{Binding UsedOcrModeSummary, StringFormat=OCR Mode: {0}}" TextWrapping="Wrap" />

@@ -9,6 +9,25 @@ internal static class SignatureCatalog
     private static readonly Regex NumericValuePattern = new(@"(?<!\d)(?:\d{1,3}(?:,\d{3})+|\d+)(?!\d)", RegexOptions.Compiled);
     private static readonly Lazy<IReadOnlyList<SignatureDefinition>> Definitions = new(LoadDefinitions);
 
+    public static IReadOnlyList<string> GetAvailableResources()
+    {
+        return Definitions.Value
+            .Select(definition => definition.Resource)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(resource => resource, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    public static string? FindMatchedResource(string? normalizedText)
+    {
+        if (!TryParseSignatureValue(normalizedText, out var observedValue))
+        {
+            return null;
+        }
+
+        return FindBestMatch(observedValue)?.Resource;
+    }
+
     public static string BuildResourceSummary(string? normalizedText)
     {
         if (!TryParseSignatureValue(normalizedText, out var observedValue))
@@ -16,18 +35,12 @@ internal static class SignatureCatalog
             return "Signature resource: no numeric value detected";
         }
 
-        var matches = Definitions.Value
-            .Where(definition => observedValue % definition.Signature == 0)
-            .OrderByDescending(definition => definition.Signature)
-            .ToList();
-
-        if (matches.Count == 0)
+        var bestMatch = FindBestMatch(observedValue);
+        if (bestMatch is null)
         {
             return $"Signature resource: no match for {observedValue:N0}";
         }
 
-        var exactMatch = matches.FirstOrDefault(definition => definition.Signature == observedValue);
-        var bestMatch = exactMatch ?? matches[0];
         var multiplier = observedValue / bestMatch.Signature;
 
         return multiplier == 1
@@ -52,6 +65,22 @@ internal static class SignatureCatalog
 
         var digits = match.Value.Replace(",", string.Empty, StringComparison.Ordinal);
         return int.TryParse(digits, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+    }
+
+    private static SignatureDefinition? FindBestMatch(int observedValue)
+    {
+        var matches = Definitions.Value
+            .Where(definition => observedValue % definition.Signature == 0)
+            .OrderByDescending(definition => definition.Signature)
+            .ToList();
+
+        if (matches.Count == 0)
+        {
+            return null;
+        }
+
+        var exactMatch = matches.FirstOrDefault(definition => definition.Signature == observedValue);
+        return exactMatch ?? matches[0];
     }
 
     private static IReadOnlyList<SignatureDefinition> LoadDefinitions()

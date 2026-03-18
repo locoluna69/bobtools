@@ -1,6 +1,8 @@
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Text;
 using BobTools.Models;
@@ -9,87 +11,132 @@ using Tesseract;
 
 namespace BobTools.Services;
 
-public sealed class OcrService : IOcrService
+public sealed class OcrService : IOcrService, IDisposable
 {
     private const int UpscaleFactor = 2;
+    private const string NumericWhitelist = "0123456789,.";
     private static readonly Regex StrictNumericValuePattern = new(@"(?<!\d)\d{1,3}(?:,\d{3})+(?!\d)", RegexOptions.Compiled);
     private static readonly Regex SignatureNumericValuePattern = new(@"(?<!\d)(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?!\d)", RegexOptions.Compiled);
     private readonly string _tessDataPath;
     private readonly string _signatureIconPath;
+    private readonly ConcurrentBag<TesseractEngine> _defaultEnginePool = new();
+    private readonly ConcurrentBag<TesseractEngine> _numericEnginePool = new();
+    private readonly OcrPipelineLogger _pipelineLogger;
+    private bool _disposed;
 
     public OcrService(string tessDataPath)
     {
         _tessDataPath = tessDataPath;
         _signatureIconPath = Path.Combine(AppContext.BaseDirectory, "Assets", "images", "signature_icon.png");
+        _pipelineLogger = new OcrPipelineLogger(Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "BobTools",
+            "Logs"));
     }
 
     public Task<OcrResult> ExtractTextAsync(Bitmap bitmap, string? debugOutputDirectory = null, string? preferredMode = null, string? captureProfile = null)
     {
         return Task.Run(() =>
         {
-            if (ShouldUseSignatureIconExtraction(captureProfile, preferredMode)
-                && TryExtractSignatureValue(bitmap, debugOutputDirectory, out var signatureResult))
-            {
-                return signatureResult;
-            }
+            ThrowIfDisposed();
 
-            using var engine = CreateEngine();
-            using var upscaled = Upscale(bitmap, UpscaleFactor);
-            using var grayscale = ToGrayscale(upscaled);
-            using var enhancedGrayscale = StretchContrast(grayscale);
-            var thresholdVariants = CreateThresholdVariants(grayscale, enhancedGrayscale);
+            var trace = new OcrPipelineTrace(bitmap, captureProfile, preferredMode, !string.IsNullOrWhiteSpace(debugOutputDirectory));
+            var totalStopwatch = Stopwatch.StartNew();
+
             try
             {
-                if (!string.IsNullOrWhiteSpace(debugOutputDirectory))
+                if (ShouldUseSignatureIconExtraction(captureProfile, preferredMode))
                 {
-                    SaveBitmap(grayscale, Path.Combine(debugOutputDirectory, "02_grayscale.png"));
-                    SaveBitmap(enhancedGrayscale, Path.Combine(debugOutputDirectory, "03_grayscale_contrast.png"));
-
-                    for (var index = 0; index < thresholdVariants.Count; index++)
+                    trace.SignatureFastPathAttempted = true;
+                    if (TryExtractSignatureValue(bitmap, debugOutputDirectory, trace, out var signatureResult))
                     {
-                        SaveBitmap(
-                            thresholdVariants[index].Bitmap,
-                            Path.Combine(debugOutputDirectory, $"{index + 4:D2}_{thresholdVariants[index].Name}.png"));
+                        trace.SignatureFastPathUsed = true;
+                        trace.SetResult(signatureResult);
+                        return signatureResult;
                     }
                 }
 
-                var attempts = new List<OcrAttempt>
+                trace.FallbackPipelineUsed = true;
+                using var engineLease = RentEngine(null, trace, isNumeric: false);
+                using var upscaled = MeasureStage(trace, "upscale", () => Upscale(bitmap, UpscaleFactor));
+                using var grayscale = MeasureStage(trace, "grayscale", () => ToGrayscale(upscaled));
+                using var enhancedGrayscale = MeasureStage(trace, "stretch_contrast", () => StretchContrast(grayscale));
+                var thresholdVariants = MeasureStage(trace, "threshold_variants", () => CreateThresholdVariants(grayscale, enhancedGrayscale));
+                try
                 {
-                    RunAttempt(engine, grayscale, PageSegMode.Auto, "grayscale-auto"),
-                    RunAttempt(engine, grayscale, PageSegMode.SingleBlock, "grayscale-block"),
-                    RunAttempt(engine, grayscale, PageSegMode.SparseText, "grayscale-sparse"),
-                    RunAttempt(engine, enhancedGrayscale, PageSegMode.Auto, "grayscale-contrast-auto"),
-                    RunAttempt(engine, enhancedGrayscale, PageSegMode.SingleBlock, "grayscale-contrast-block"),
-                    RunAttempt(engine, enhancedGrayscale, PageSegMode.SparseText, "grayscale-contrast-sparse")
-                };
+                    if (!string.IsNullOrWhiteSpace(debugOutputDirectory))
+                    {
+                        MeasureStage(trace, "debug_bitmap_writes", () =>
+                        {
+                            SaveBitmap(grayscale, Path.Combine(debugOutputDirectory, "02_grayscale.png"));
+                            SaveBitmap(enhancedGrayscale, Path.Combine(debugOutputDirectory, "03_grayscale_contrast.png"));
 
-                foreach (var variant in thresholdVariants)
-                {
-                    attempts.Add(RunAttempt(engine, variant.Bitmap, PageSegMode.Auto, $"{variant.Name}-auto"));
-                    attempts.Add(RunAttempt(engine, variant.Bitmap, PageSegMode.SingleBlock, $"{variant.Name}-block"));
-                    attempts.Add(RunAttempt(engine, variant.Bitmap, PageSegMode.SparseText, $"{variant.Name}-sparse"));
+                            for (var index = 0; index < thresholdVariants.Count; index++)
+                            {
+                                SaveBitmap(
+                                    thresholdVariants[index].Bitmap,
+                                    Path.Combine(debugOutputDirectory, $"{index + 4:D2}_{thresholdVariants[index].Name}.png"));
+                            }
+                        });
+                    }
+
+                    var attempts = MeasureStage(trace, "ocr_attempts", () =>
+                    {
+                        var localAttempts = new List<OcrAttempt>
+                        {
+                            RunAttempt(engineLease.Engine, grayscale, PageSegMode.Auto, "grayscale-auto"),
+                            RunAttempt(engineLease.Engine, grayscale, PageSegMode.SingleBlock, "grayscale-block"),
+                            RunAttempt(engineLease.Engine, grayscale, PageSegMode.SparseText, "grayscale-sparse"),
+                            RunAttempt(engineLease.Engine, enhancedGrayscale, PageSegMode.Auto, "grayscale-contrast-auto"),
+                            RunAttempt(engineLease.Engine, enhancedGrayscale, PageSegMode.SingleBlock, "grayscale-contrast-block"),
+                            RunAttempt(engineLease.Engine, enhancedGrayscale, PageSegMode.SparseText, "grayscale-contrast-sparse")
+                        };
+
+                        foreach (var variant in thresholdVariants)
+                        {
+                            localAttempts.Add(RunAttempt(engineLease.Engine, variant.Bitmap, PageSegMode.Auto, $"{variant.Name}-auto"));
+                            localAttempts.Add(RunAttempt(engineLease.Engine, variant.Bitmap, PageSegMode.SingleBlock, $"{variant.Name}-block"));
+                            localAttempts.Add(RunAttempt(engineLease.Engine, variant.Bitmap, PageSegMode.SparseText, $"{variant.Name}-sparse"));
+                        }
+
+                        return localAttempts;
+                    });
+
+                    trace.AttemptCount = attempts.Count;
+
+                    var scoredAttempts = MeasureStage(trace, "score_attempts", () => attempts
+                        .Select(attempt => EvaluateAttempt(attempt, captureProfile))
+                        .ToList());
+
+                    var best = MeasureStage(trace, "select_best_attempt", () => SelectBestAttempt(scoredAttempts, preferredMode));
+                    var result = MeasureStage(trace, "build_result", () => BuildResult(best, preferredMode));
+
+                    if (!string.IsNullOrWhiteSpace(debugOutputDirectory))
+                    {
+                        MeasureStage(trace, "debug_summary_write", () => SaveDebugSummary(debugOutputDirectory, scoredAttempts, result, preferredMode));
+                    }
+
+                    trace.SetResult(result);
+                    return result;
                 }
-
-                var scoredAttempts = attempts
-                    .Select(attempt => EvaluateAttempt(attempt, captureProfile))
-                    .ToList();
-
-                var best = SelectBestAttempt(scoredAttempts, preferredMode);
-                var result = BuildResult(best, preferredMode);
-
-                if (!string.IsNullOrWhiteSpace(debugOutputDirectory))
+                finally
                 {
-                    SaveDebugSummary(debugOutputDirectory, scoredAttempts, result, preferredMode);
+                    foreach (var variant in thresholdVariants)
+                    {
+                        variant.Bitmap.Dispose();
+                    }
                 }
-
-                return result;
+            }
+            catch (Exception ex)
+            {
+                trace.SetFailure(ex);
+                throw;
             }
             finally
             {
-                foreach (var variant in thresholdVariants)
-                {
-                    variant.Bitmap.Dispose();
-                }
+                totalStopwatch.Stop();
+                trace.StageTimingsMs["total"] = totalStopwatch.Elapsed.TotalMilliseconds;
+                _pipelineLogger.Write(trace.ToLogEntry());
             }
         });
     }
@@ -120,7 +167,7 @@ public sealed class OcrService : IOcrService
             || string.Equals(preferredMode, OcrModeCatalog.RightmostNumericValue, StringComparison.OrdinalIgnoreCase);
     }
 
-    private bool TryExtractSignatureValue(Bitmap bitmap, string? debugOutputDirectory, out OcrResult result)
+    private bool TryExtractSignatureValue(Bitmap bitmap, string? debugOutputDirectory, OcrPipelineTrace trace, out OcrResult result)
     {
         result = new OcrResult();
 
@@ -129,66 +176,76 @@ public sealed class OcrService : IOcrService
             return false;
         }
 
-        using var rawIconBitmap = new Bitmap(_signatureIconPath);
-        using var iconBitmap = TrimTransparentBorders(rawIconBitmap);
-        if (!TryLocateTemplate(bitmap, iconBitmap, out var iconBounds, out var matchScore))
+        using var rawIconBitmap = MeasureStage(trace, "signature_icon_load", () => new Bitmap(_signatureIconPath));
+        using var iconBitmap = MeasureStage(trace, "signature_icon_trim", () => TrimTransparentBorders(rawIconBitmap));
+        var locatedTemplate = MeasureStage(trace, "signature_icon_locate", () => TryLocateTemplate(bitmap, iconBitmap, out var iconBounds, out var matchScore)
+            ? (Success: true, Bounds: iconBounds, Score: matchScore)
+            : (Success: false, Bounds: Rectangle.Empty, Score: double.MinValue));
+
+        if (!locatedTemplate.Success)
         {
             return false;
         }
 
-        using var numericEngine = CreateEngine("0123456789,.");
+        using var numericEngineLease = RentEngine(NumericWhitelist, trace, isNumeric: true);
         var candidateAttempts = new List<SignatureNumericAttempt>();
-        var candidateRegions = BuildSignatureValueRegions(bitmap.Size, iconBounds);
+        var candidateRegions = MeasureStage(trace, "signature_candidate_regions", () => BuildSignatureValueRegions(bitmap.Size, locatedTemplate.Bounds));
+        trace.SignatureCandidateRegionCount = candidateRegions.Count;
 
-        for (var regionIndex = 0; regionIndex < candidateRegions.Count; regionIndex++)
+        MeasureStage(trace, "signature_candidate_ocr", () =>
         {
-            var valueRegion = candidateRegions[regionIndex];
-            if (valueRegion.Width < 8 || valueRegion.Height < 8)
+            for (var regionIndex = 0; regionIndex < candidateRegions.Count; regionIndex++)
             {
-                continue;
-            }
-
-            using var valueBitmap = CropBitmap(bitmap, valueRegion);
-            using var upscaled = Upscale(valueBitmap, UpscaleFactor);
-            using var grayscale = ToGrayscale(upscaled);
-            using var enhancedGrayscale = StretchContrast(grayscale);
-            var thresholdVariants = CreateThresholdVariants(grayscale, enhancedGrayscale);
-
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(debugOutputDirectory) && regionIndex == 0)
+                var valueRegion = candidateRegions[regionIndex];
+                if (valueRegion.Width < 8 || valueRegion.Height < 8)
                 {
-                    SaveBitmap(valueBitmap, Path.Combine(debugOutputDirectory, "00_signature_value_region.png"));
-                    SaveBitmap(grayscale, Path.Combine(debugOutputDirectory, "00_signature_value_grayscale.png"));
-                    SaveBitmap(enhancedGrayscale, Path.Combine(debugOutputDirectory, "00_signature_value_contrast.png"));
+                    continue;
                 }
 
-                var attempts = new List<OcrAttempt>
-                {
-                    RunAttempt(numericEngine, grayscale, PageSegMode.SingleLine, $"signature-icon-r{regionIndex}-grayscale-line"),
-                    RunAttempt(numericEngine, grayscale, PageSegMode.SingleWord, $"signature-icon-r{regionIndex}-grayscale-word"),
-                    RunAttempt(numericEngine, enhancedGrayscale, PageSegMode.SingleLine, $"signature-icon-r{regionIndex}-contrast-line"),
-                    RunAttempt(numericEngine, enhancedGrayscale, PageSegMode.SingleWord, $"signature-icon-r{regionIndex}-contrast-word")
-                };
+                using var valueBitmap = CropBitmap(bitmap, valueRegion);
+                using var upscaled = Upscale(valueBitmap, UpscaleFactor);
+                using var grayscale = ToGrayscale(upscaled);
+                using var enhancedGrayscale = StretchContrast(grayscale);
+                var thresholdVariants = CreateThresholdVariants(grayscale, enhancedGrayscale);
 
-                foreach (var variant in thresholdVariants)
+                try
                 {
-                    attempts.Add(RunAttempt(numericEngine, variant.Bitmap, PageSegMode.SingleLine, $"signature-icon-r{regionIndex}-{variant.Name}-line"));
-                    attempts.Add(RunAttempt(numericEngine, variant.Bitmap, PageSegMode.SingleWord, $"signature-icon-r{regionIndex}-{variant.Name}-word"));
-                }
+                    if (!string.IsNullOrWhiteSpace(debugOutputDirectory) && regionIndex == 0)
+                    {
+                        SaveBitmap(valueBitmap, Path.Combine(debugOutputDirectory, "00_signature_value_region.png"));
+                        SaveBitmap(grayscale, Path.Combine(debugOutputDirectory, "00_signature_value_grayscale.png"));
+                        SaveBitmap(enhancedGrayscale, Path.Combine(debugOutputDirectory, "00_signature_value_contrast.png"));
+                    }
 
-                candidateAttempts.AddRange(attempts
-                    .Select(attempt => new SignatureNumericAttempt(attempt, ExtractSignatureNumericValue(attempt.NormalizedText), valueRegion))
-                    .Where(candidate => !string.IsNullOrWhiteSpace(candidate.ExtractedValue)));
-            }
-            finally
-            {
-                foreach (var variant in thresholdVariants)
+                    var attempts = new List<OcrAttempt>
+                    {
+                        RunAttempt(numericEngineLease.Engine, grayscale, PageSegMode.SingleLine, $"signature-icon-r{regionIndex}-grayscale-line"),
+                        RunAttempt(numericEngineLease.Engine, grayscale, PageSegMode.SingleWord, $"signature-icon-r{regionIndex}-grayscale-word"),
+                        RunAttempt(numericEngineLease.Engine, enhancedGrayscale, PageSegMode.SingleLine, $"signature-icon-r{regionIndex}-contrast-line"),
+                        RunAttempt(numericEngineLease.Engine, enhancedGrayscale, PageSegMode.SingleWord, $"signature-icon-r{regionIndex}-contrast-word")
+                    };
+
+                    foreach (var variant in thresholdVariants)
+                    {
+                        attempts.Add(RunAttempt(numericEngineLease.Engine, variant.Bitmap, PageSegMode.SingleLine, $"signature-icon-r{regionIndex}-{variant.Name}-line"));
+                        attempts.Add(RunAttempt(numericEngineLease.Engine, variant.Bitmap, PageSegMode.SingleWord, $"signature-icon-r{regionIndex}-{variant.Name}-word"));
+                    }
+
+                    candidateAttempts.AddRange(attempts
+                        .Select(attempt => new SignatureNumericAttempt(attempt, ExtractSignatureNumericValue(attempt.NormalizedText), valueRegion))
+                        .Where(candidate => !string.IsNullOrWhiteSpace(candidate.ExtractedValue)));
+                }
+                finally
                 {
-                    variant.Bitmap.Dispose();
+                    foreach (var variant in thresholdVariants)
+                    {
+                        variant.Bitmap.Dispose();
+                    }
                 }
             }
-        }
+        });
+
+        trace.SignatureCandidateAttemptCount = candidateAttempts.Count;
 
         var bestAttempt = SelectBestSignatureNumericAttempt(candidateAttempts);
         if (bestAttempt is null)
@@ -215,10 +272,22 @@ public sealed class OcrService : IOcrService
 
             File.WriteAllText(
                 Path.Combine(debugOutputDirectory, "00_signature_icon_match.txt"),
-                $"Icon bounds: {iconBounds}\nMatch score: {matchScore:F4}\nSelected value region: {bestAttempt.Region}\nSelected value: {result.NormalizedText}\nUsed mode: {result.UsedMode}\nCandidate count: {candidateAttempts.Count}\n\nTop candidates:\n{candidateSummary}");
+                $"Icon bounds: {locatedTemplate.Bounds}\nMatch score: {locatedTemplate.Score:F4}\nSelected value region: {bestAttempt.Region}\nSelected value: {result.NormalizedText}\nUsed mode: {result.UsedMode}\nCandidate count: {candidateAttempts.Count}\n\nTop candidates:\n{candidateSummary}");
         }
 
         return true;
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        DisposePool(_defaultEnginePool);
+        DisposePool(_numericEnginePool);
     }
 
     private static OcrAttempt RunAttempt(TesseractEngine engine, Bitmap bitmap, PageSegMode pageSegMode, string name)
@@ -1039,10 +1108,186 @@ public sealed class OcrService : IOcrService
         File.WriteAllText(Path.Combine(debugOutputDirectory, "ocr_selected.txt"), result.NormalizedText);
     }
 
+    private EngineLease RentEngine(string? characterWhitelist, OcrPipelineTrace trace, bool isNumeric)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var pool = isNumeric ? _numericEnginePool : _defaultEnginePool;
+        var created = !pool.TryTake(out var engine);
+        engine ??= CreateEngine(characterWhitelist);
+        stopwatch.Stop();
+
+        trace.StageTimingsMs[isNumeric ? "numeric_engine_rent" : "default_engine_rent"] = stopwatch.Elapsed.TotalMilliseconds;
+        if (isNumeric)
+        {
+            trace.NumericEngineLease = created ? "created" : "reused";
+        }
+        else
+        {
+            trace.DefaultEngineLease = created ? "created" : "reused";
+        }
+
+        return new EngineLease(engine, returnedEngine =>
+        {
+            if (_disposed)
+            {
+                returnedEngine.Dispose();
+                return;
+            }
+
+            pool.Add(returnedEngine);
+        });
+    }
+
+    private static T MeasureStage<T>(OcrPipelineTrace trace, string stageName, Func<T> action)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            return action();
+        }
+        finally
+        {
+            stopwatch.Stop();
+            trace.StageTimingsMs[stageName] = stopwatch.Elapsed.TotalMilliseconds;
+        }
+    }
+
+    private static void MeasureStage(OcrPipelineTrace trace, string stageName, Action action)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            action();
+        }
+        finally
+        {
+            stopwatch.Stop();
+            trace.StageTimingsMs[stageName] = stopwatch.Elapsed.TotalMilliseconds;
+        }
+    }
+
+    private static void DisposePool(ConcurrentBag<TesseractEngine> pool)
+    {
+        while (pool.TryTake(out var engine))
+        {
+            engine.Dispose();
+        }
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(OcrService));
+        }
+    }
+
     private sealed record OcrAttempt(string Name, string RawText, string NormalizedText, float Confidence);
     private sealed record ScoredOcrAttempt(OcrAttempt Attempt, double TotalScore, double BaseScore, MiningAttemptAnalysis MiningAnalysis);
     private sealed record MiningAttemptAnalysis(double ScoreAdjustment, string Notes, RockScan? ParsedScan);
     private sealed record SignatureNumericGroup(string Value, int VoteCount, double BestScore, double TotalScore, SignatureNumericAttempt BestAttempt);
     private sealed record SignatureNumericAttempt(OcrAttempt Attempt, string ExtractedValue, Rectangle Region);
     private sealed record ThresholdVariant(string Name, Bitmap Bitmap, int Threshold, bool Invert);
+
+    private sealed class EngineLease : IDisposable
+    {
+        private readonly Action<TesseractEngine> _returnAction;
+        private bool _disposed;
+
+        public EngineLease(TesseractEngine engine, Action<TesseractEngine> returnAction)
+        {
+            Engine = engine;
+            _returnAction = returnAction;
+        }
+
+        public TesseractEngine Engine { get; }
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            _returnAction(Engine);
+        }
+    }
+
+    private sealed class OcrPipelineTrace
+    {
+        public OcrPipelineTrace(Bitmap bitmap, string? captureProfile, string? preferredMode, bool debugArtifactsEnabled)
+        {
+            RequestId = Guid.NewGuid().ToString();
+            TimestampUtc = DateTime.UtcNow;
+            CaptureProfile = captureProfile;
+            PreferredMode = preferredMode;
+            ImageWidth = bitmap.Width;
+            ImageHeight = bitmap.Height;
+            DebugArtifactsEnabled = debugArtifactsEnabled;
+        }
+
+        public string RequestId { get; }
+        public DateTime TimestampUtc { get; }
+        public string? CaptureProfile { get; }
+        public string? PreferredMode { get; }
+        public int ImageWidth { get; }
+        public int ImageHeight { get; }
+        public bool DebugArtifactsEnabled { get; }
+        public bool SignatureFastPathAttempted { get; set; }
+        public bool SignatureFastPathUsed { get; set; }
+        public bool FallbackPipelineUsed { get; set; }
+        public string? DefaultEngineLease { get; set; }
+        public string? NumericEngineLease { get; set; }
+        public int AttemptCount { get; set; }
+        public int SignatureCandidateRegionCount { get; set; }
+        public int SignatureCandidateAttemptCount { get; set; }
+        public string Status { get; private set; } = "completed";
+        public string? ResultMode { get; private set; }
+        public double? ResultConfidence { get; private set; }
+        public int ResultTextLength { get; private set; }
+        public string? Exception { get; private set; }
+        public Dictionary<string, double> StageTimingsMs { get; } = [];
+
+        public void SetResult(OcrResult result)
+        {
+            ResultMode = result.UsedMode;
+            ResultConfidence = result.Confidence;
+            ResultTextLength = result.NormalizedText?.Length ?? 0;
+        }
+
+        public void SetFailure(Exception exception)
+        {
+            Status = "failed";
+            Exception = exception.ToString();
+        }
+
+        public OcrPipelineLogEntry ToLogEntry()
+        {
+            return new OcrPipelineLogEntry
+            {
+                RequestId = RequestId,
+                TimestampUtc = TimestampUtc,
+                Status = Status,
+                CaptureProfile = CaptureProfile,
+                PreferredMode = PreferredMode,
+                ImageWidth = ImageWidth,
+                ImageHeight = ImageHeight,
+                DebugArtifactsEnabled = DebugArtifactsEnabled,
+                SignatureFastPathAttempted = SignatureFastPathAttempted,
+                SignatureFastPathUsed = SignatureFastPathUsed,
+                FallbackPipelineUsed = FallbackPipelineUsed,
+                DefaultEngineLease = DefaultEngineLease,
+                NumericEngineLease = NumericEngineLease,
+                AttemptCount = AttemptCount,
+                SignatureCandidateRegionCount = SignatureCandidateRegionCount,
+                SignatureCandidateAttemptCount = SignatureCandidateAttemptCount,
+                ResultMode = ResultMode,
+                ResultConfidence = ResultConfidence,
+                ResultTextLength = ResultTextLength,
+                Exception = Exception,
+                StageTimingsMs = new Dictionary<string, double>(StageTimingsMs)
+            };
+        }
+    }
 }
