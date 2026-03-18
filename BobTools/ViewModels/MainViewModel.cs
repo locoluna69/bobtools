@@ -35,6 +35,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly Task _liveScanQueueTask;
     private readonly Task _liveMiningQueueTask;
     private bool _isUpdatingScanTargetSelection;
+    private bool _isSyncingOfflineScanSelection;
 
     [ObservableProperty] private string status = "Ready.";
     [ObservableProperty] private string acceptedText = string.Empty;
@@ -73,6 +74,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private double offlineSelectionHeight;
     [ObservableProperty] private Visibility offlineSelectionVisibility = Visibility.Collapsed;
     [ObservableProperty] private OfflineInputImageItem? selectedOfflineInputImage;
+    [ObservableProperty] private OfflineScanResultItem? selectedOfflineScanResult;
     [ObservableProperty] private OfflineMiningResultItem? selectedOfflineMiningResult;
 
     private int _offlineImagePixelWidth;
@@ -98,6 +100,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public IReadOnlyList<CaptureProfileOption> WorkflowModeOptions { get; } = WorkflowModeCatalog.Options;
     public IReadOnlyList<CaptureProfileOption> CaptureProfileOptions { get; } = CaptureProfileCatalog.Options;
     public ObservableCollection<OfflineInputImageItem> OfflineInputImages { get; } = new();
+    public ObservableCollection<OfflineScanResultItem> OfflineScanResults { get; } = new();
     public ObservableCollection<OfflineMiningResultItem> OfflineMiningResults { get; } = new();
     public ObservableCollection<ScanTargetOption> ScanTargetOptions { get; } = new();
     public ObservableCollection<LiveScanResultItem> LiveScanResults { get; } = new();
@@ -678,6 +681,60 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         LoadOfflinePreview(value?.FilePath);
         UpdateOfflineSelectionPreview();
+
+        if (_isSyncingOfflineScanSelection || IsOfflineMiningSelected || value is null)
+        {
+            return;
+        }
+
+        var matchingResult = OfflineScanResults.FirstOrDefault(item => string.Equals(item.SourceImagePath, value.FilePath, StringComparison.OrdinalIgnoreCase));
+        if (matchingResult is not null && !ReferenceEquals(SelectedOfflineScanResult, matchingResult))
+        {
+            _isSyncingOfflineScanSelection = true;
+            try
+            {
+                SelectedOfflineScanResult = matchingResult;
+            }
+            finally
+            {
+                _isSyncingOfflineScanSelection = false;
+            }
+        }
+    }
+
+    partial void OnSelectedOfflineScanResultChanged(OfflineScanResultItem? value)
+    {
+        if (value is null)
+        {
+            OfflineResultText = string.Empty;
+            OfflineSignatureResourceSummary = "Scan resource: none yet";
+            OfflineSelectionModeSummary = "Selection mode: none";
+            return;
+        }
+
+        OfflineResultText = value.OcrText;
+        OfflineSignatureResourceSummary = value.SignatureResourceSummary;
+        OfflineMiningRockSummary = "Rock scan: n/a for Scan";
+        OfflineSelectionModeSummary = value.SelectionModeSummary;
+
+        if (_isSyncingOfflineScanSelection)
+        {
+            return;
+        }
+
+        var matchingInput = OfflineInputImages.FirstOrDefault(item => string.Equals(item.FilePath, value.SourceImagePath, StringComparison.OrdinalIgnoreCase));
+        if (matchingInput is not null && !ReferenceEquals(SelectedOfflineInputImage, matchingInput))
+        {
+            _isSyncingOfflineScanSelection = true;
+            try
+            {
+                SelectedOfflineInputImage = matchingInput;
+            }
+            finally
+            {
+                _isSyncingOfflineScanSelection = false;
+            }
+        }
     }
 
     partial void OnSelectedOfflineMiningResultChanged(OfflineMiningResultItem? value)
@@ -866,12 +923,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (SelectedOfflineInputImage is null || !File.Exists(SelectedOfflineInputImage.FilePath))
-        {
-            Status = "Select an offline image to process first.";
-            return;
-        }
+        await RunOfflineScanBatchAsync();
+    }
 
+    private async Task RunOfflineScanBatchAsync()
+    {
         var region = GetCaptureRegion(OfflineSelectedCaptureProfile);
         if (!region.IsValid)
         {
@@ -879,61 +935,109 @@ public partial class MainViewModel : ObservableObject, IDisposable
             return;
         }
 
-        try
+        OfflineScanResults.Clear();
+        SelectedOfflineScanResult = null;
+
+        var processedCount = 0;
+        foreach (var inputImage in OfflineInputImages)
         {
-            using var sourceBitmap = new Bitmap(SelectedOfflineInputImage.FilePath);
-            if (!TryGetOfflineCropBounds(region, sourceBitmap.Width, sourceBitmap.Height, out var cropBounds, out var useWholeImage, out var errorMessage))
+            Status = $"Running offline OCR {processedCount + 1}/{OfflineInputImages.Count}: {inputImage.DisplayName}";
+
+            try
             {
-                Status = errorMessage;
-                return;
+                using var sourceBitmap = new Bitmap(inputImage.FilePath);
+                if (!TryGetOfflineCropBounds(region, sourceBitmap.Width, sourceBitmap.Height, out var cropBounds, out var useWholeImage, out var errorMessage))
+                {
+                    OfflineScanResults.Add(new OfflineScanResultItem(
+                        inputImage.FilePath,
+                        inputImage.FilePath,
+                        string.Empty,
+                        "Scan resource: unable to evaluate",
+                        string.Empty,
+                        string.Empty,
+                        null,
+                        false,
+                        $"Skipped: {errorMessage}",
+                        "Selection mode: unavailable"));
+                    continue;
+                }
+
+                var debugOutputDirectory = CreateOfflineDebugOutputDirectory(OfflineSelectedCaptureProfile);
+                using var croppedBitmap = sourceBitmap.Clone(cropBounds, sourceBitmap.PixelFormat);
+
+                if (debugOutputDirectory is not null)
+                {
+                    SaveOfflineDebugArtifacts(debugOutputDirectory, inputImage.FilePath, sourceBitmap, croppedBitmap, cropBounds, useWholeImage);
+                }
+
+                var result = await _ocrService.ExtractTextAsync(croppedBitmap, debugOutputDirectory, SelectedOcrMode, OfflineSelectedCaptureProfile);
+                var usedOcrModeSummary = OcrModeCatalog.GetDisplayName(result.UsedMode);
+                var ocrSourceSummary = GetOcrSourceSummary(result.UsedMode, OfflineSelectedCaptureProfile);
+                var offlineSignatureSummary = BuildSignatureResourceSummary(OfflineSelectedCaptureProfile, result.NormalizedText);
+                var matchedResourceName = GetMatchedScanResource(OfflineSelectedCaptureProfile, result.NormalizedText);
+                var isTargetMatch = IsSelectedScanTarget(matchedResourceName);
+                var processedImagePath = ResolveProcessedImagePath(debugOutputDirectory, result.UsedMode) ?? inputImage.FilePath;
+                var selectionModeSummary = useWholeImage
+                    ? $"Selection mode: full dropped image ({GetCaptureProfileLabel(OfflineSelectedCaptureProfile)} box did not fit)"
+                    : $"Selection mode: saved {GetCaptureProfileLabel(OfflineSelectedCaptureProfile)} box";
+
+                LastUsedOcrMode = $"Last OCR mode: {usedOcrModeSummary}";
+                LastOcrSourceSummary = ocrSourceSummary;
+
+                OfflineScanResults.Add(new OfflineScanResultItem(
+                    inputImage.FilePath,
+                    processedImagePath,
+                    result.NormalizedText,
+                    offlineSignatureSummary,
+                    usedOcrModeSummary,
+                    ocrSourceSummary,
+                    matchedResourceName,
+                    isTargetMatch,
+                    "Processed",
+                    selectionModeSummary));
+
+                PersistScanSessionHistory(
+                    Guid.NewGuid().ToString(),
+                    DateTime.UtcNow,
+                    WorkflowModeCatalog.Offline,
+                    "offline",
+                    OfflineSelectedCaptureProfile,
+                    result.NormalizedText,
+                    usedOcrModeSummary,
+                    ocrSourceSummary,
+                    "Processed",
+                    offlineSignatureSummary,
+                    matchedResourceName,
+                    isTargetMatch,
+                    inputImage.FilePath,
+                    processedImagePath,
+                    debugOutputDirectory);
+
+                processedCount++;
             }
-
-            var debugOutputDirectory = CreateOfflineDebugOutputDirectory(OfflineSelectedCaptureProfile);
-            Status = useWholeImage
-                ? $"Running offline OCR on full dropped image for {GetCaptureProfileLabel(OfflineSelectedCaptureProfile)}..."
-                : $"Running offline OCR for {GetCaptureProfileLabel(OfflineSelectedCaptureProfile)}...";
-            using var croppedBitmap = sourceBitmap.Clone(cropBounds, sourceBitmap.PixelFormat);
-
-            if (debugOutputDirectory is not null)
+            catch (Exception ex)
             {
-                SaveOfflineDebugArtifacts(debugOutputDirectory, SelectedOfflineInputImage.FilePath, sourceBitmap, croppedBitmap, cropBounds, useWholeImage);
+                OfflineScanResults.Add(new OfflineScanResultItem(
+                    inputImage.FilePath,
+                    inputImage.FilePath,
+                    string.Empty,
+                    "Scan resource: processing failed",
+                    string.Empty,
+                    string.Empty,
+                    null,
+                    false,
+                    $"Failed: {ex.Message}",
+                    "Selection mode: unavailable"));
             }
-
-            var result = await _ocrService.ExtractTextAsync(croppedBitmap, debugOutputDirectory, SelectedOcrMode, OfflineSelectedCaptureProfile);
-            OfflineResultText = result.NormalizedText;
-            var usedOcrModeSummary = OcrModeCatalog.GetDisplayName(result.UsedMode);
-            var ocrSourceSummary = GetOcrSourceSummary(result.UsedMode, OfflineSelectedCaptureProfile);
-            var offlineSignatureSummary = BuildSignatureResourceSummary(OfflineSelectedCaptureProfile, result.NormalizedText);
-            var matchedResourceName = GetMatchedScanResource(OfflineSelectedCaptureProfile, result.NormalizedText);
-            var isTargetMatch = IsSelectedScanTarget(matchedResourceName);
-
-            LastUsedOcrMode = $"Last OCR mode: {usedOcrModeSummary}";
-            LastOcrSourceSummary = ocrSourceSummary;
-            OfflineSignatureResourceSummary = offlineSignatureSummary;
-            var appendSummary = AppendMiningRockScanIfApplicable(OfflineSelectedCaptureProfile, result.NormalizedText, "offline", SelectedOfflineInputImage.FilePath, debugOutputDirectory);
-            OfflineMiningRockSummary = appendSummary.Summary;
-            PersistScanSessionHistory(
-                Guid.NewGuid().ToString(),
-                DateTime.UtcNow,
-                WorkflowModeCatalog.Offline,
-                "offline",
-                OfflineSelectedCaptureProfile,
-                result.NormalizedText,
-                usedOcrModeSummary,
-                ocrSourceSummary,
-                "Processed",
-                offlineSignatureSummary,
-                matchedResourceName,
-                isTargetMatch,
-                SelectedOfflineInputImage.FilePath,
-                ResolveProcessedImagePath(debugOutputDirectory, result.UsedMode) ?? SelectedOfflineInputImage.FilePath,
-                debugOutputDirectory);
-            Status = BuildOfflineCompletionStatus(OfflineSelectedCaptureProfile, useWholeImage, debugOutputDirectory, appendSummary.CsvPath, appendSummary.JsonPath);
         }
-        catch (Exception ex)
-        {
-            Status = $"Offline OCR error: {ex.Message}";
-        }
+
+        SelectedOfflineScanResult = OfflineScanResults.FirstOrDefault(item => SelectedOfflineInputImage is not null
+            && string.Equals(item.SourceImagePath, SelectedOfflineInputImage.FilePath, StringComparison.OrdinalIgnoreCase))
+            ?? OfflineScanResults.FirstOrDefault();
+
+        Status = OfflineScanResults.Count == 0
+            ? "No offline scan images were processed."
+            : $"Processed {processedCount} scan image(s). Review the results list for OCR accuracy.";
     }
 
     private async Task RunOfflineMiningBatchAsync()

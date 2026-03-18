@@ -49,10 +49,34 @@ internal sealed class OcrPipelineLogEntry
     public string? NumericEngineLease { get; set; }
     public int AttemptCount { get; set; }
     public int SignatureCandidateRegionCount { get; set; }
+    public int SignatureRegionsProcessedCount { get; set; }
     public int SignatureCandidateAttemptCount { get; set; }
+    public bool SignatureEarlyStopTriggered { get; set; }
+    public int? SignatureEarlyStopRegionIndex { get; set; }
+    public int? SignatureWinningRegionIndex { get; set; }
+    public string? SignatureFastPathRejectedReason { get; set; }
+    public int? MaxCandidateAttemptsInRegion { get; set; }
+    public double? AverageCandidateAttemptsPerProcessedRegion { get; set; }
     public string? ResultMode { get; set; }
     public double? ResultConfidence { get; set; }
     public int ResultTextLength { get; set; }
     public string? Exception { get; set; }
     public Dictionary<string, double> StageTimingsMs { get; set; } = [];
+    public List<OcrCandidateRegionLogEntry> CandidateRegions { get; set; } = [];
+}
+
+internal sealed class OcrCandidateRegionLogEntry
+{
+    public int RegionIndex { get; set; }
+    public int X { get; set; }
+    public int Y { get; set; }
+    public int Width { get; set; }
+    public int Height { get; set; }
+    public int AttemptCount { get; set; }
+    public int CandidateCount { get; set; }
+    public double ElapsedMs { get; set; }
+    public string? BestValue { get; set; }
+    public double? BestScore { get; set; }
+    public bool HasStrictNumericMatch { get; set; }
+    public bool EarlyStopTriggered { get; set; }
 }

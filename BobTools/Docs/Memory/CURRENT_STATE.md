@@ -16,6 +16,13 @@ BobTools is a Windows WPF overlay app for Star Citizen that:
 - Signature OCR uses a specialized icon-guided path when OCR mode is `Auto` or `Rightmost Numeric Value`.
 - The app looks for `Assets/images/signature_icon.png`, crops candidate regions to the right, OCRs those numeric regions, and ranks the results.
 - Signature OCR results are matched against `Assets/data/signatures.csv`.
+- Signature OCR now includes several tuning layers beyond the original icon-guided crop:
+  - pooled numeric/default Tesseract engines
+  - append-only JSONL pipeline timing logs under `LocalAppData/BobTools/Logs`
+  - reduced candidate-region search and early-stop on strong numeric matches
+  - rejection of implausible icon matches and weak fast-path results
+  - catalog-aware signature correction for common `5`/`6`/`8` OCR drift
+  - signature-specific fallback scoring that prefers clean numeric tokens over verbose garbage OCR blocks
 - The UI displays the matched resource in:
   - the live results tab
   - the offline test tab
@@ -54,6 +61,7 @@ BobTools is a Windows WPF overlay app for Star Citizen that:
 - [Views/ReviewWindow.xaml](Views/ReviewWindow.xaml)
 - [Views/ReviewWindow.xaml.cs](Views/ReviewWindow.xaml.cs)
 - [Docs/Memory/2026-03-15-handoff.md](Docs/Memory/2026-03-15-handoff.md)
+- [Docs/Memory/2026-03-17-ocr-performance-tuning.md](Docs/Memory/2026-03-17-ocr-performance-tuning.md)
 
 ## Current OCR workflow summary
 
@@ -104,6 +112,10 @@ BobTools is a Windows WPF overlay app for Star Citizen that:
 - add quick-open for the latest debug capture folder
 - add more visual debugging around icon match and crop region
 - improve mining field extraction robustness for noisier OCR cases
+- add `buildId` or app version to OCR log entries for exact build-to-build drift analysis
+- add `sourceImageName` or scenario labels to OCR log entries for offline test-set comparisons
+- add explicit pipeline outcome labels such as `fast-success`, `fast-rejected`, and `fallback-numeric`
+- consider a secondary icon-search pass constrained to the expected in-game UI band for the last difficult signature images
 
 ## If something breaks
 

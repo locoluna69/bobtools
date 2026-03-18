@@ -600,24 +600,89 @@
                                 </Style>
                             </Grid.Style>
 
-                            <GroupBox Header="Offline OCR Result" Foreground="White" BorderBrush="#475569">
-                                <Grid Margin="4">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="8" />
-                                        <RowDefinition Height="*" />
-                                    </Grid.RowDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="10" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
 
-                                    <StackPanel Grid.Row="0">
-                                        <TextBlock Foreground="#A7F3D0" FontWeight="SemiBold" TextWrapping="Wrap"
-                                                   Text="{Binding OfflineSignatureResourceSummary}" />
-                                        <TextBlock Margin="0,2,0,0" Foreground="#93C5FD" FontWeight="SemiBold" TextWrapping="Wrap"
-                                                   Text="{Binding OfflineMiningRockSummary}" />
-                                    </StackPanel>
-                                    <TextBox Grid.Row="2" Text="{Binding OfflineResultText}" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" IsReadOnly="True"
-                                             Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
-                                </Grid>
-                            </GroupBox>
+                            <StackPanel Grid.Row="0">
+                                <TextBlock Foreground="#A7F3D0" FontWeight="SemiBold" TextWrapping="Wrap"
+                                           Text="{Binding OfflineSignatureResourceSummary}" />
+                                <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" TextWrapping="Wrap"
+                                           Text="{Binding OfflineSelectionModeSummary}" />
+                                <ComboBox Margin="0,8,0,0"
+                                          ItemsSource="{Binding OfflineScanResults}"
+                                          SelectedItem="{Binding SelectedOfflineScanResult}"
+                                          DisplayMemberPath="DisplayName"
+                                          Background="#0F172A"
+                                          Foreground="#E5E7EB"
+                                          BorderBrush="#334155" />
+                            </StackPanel>
+
+                            <Grid Grid.Row="2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="1.15*" />
+                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="1.6*" />
+                                </Grid.ColumnDefinitions>
+
+                                <GroupBox Header="Processed Image" Foreground="White" BorderBrush="#475569">
+                                    <Grid Margin="6">
+                                        <Border Background="#0F172A" BorderBrush="#334155" BorderThickness="1" CornerRadius="6">
+                                            <Image Source="{Binding SelectedOfflineScanResult.ProcessedPreviewImage}" Stretch="Uniform" />
+                                        </Border>
+                                    </Grid>
+                                </GroupBox>
+
+                                <GroupBox Grid.Column="2" Header="Scan Review" Foreground="White" BorderBrush="#475569">
+                                    <ScrollViewer Margin="6" VerticalScrollBarVisibility="Auto">
+                                        <StackPanel>
+                                            <Border Padding="10" CornerRadius="6" Background="#0F172A" BorderBrush="#334155" BorderThickness="1">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="10" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto" />
+                                                        <RowDefinition Height="Auto" />
+                                                        <RowDefinition Height="Auto" />
+                                                        <RowDefinition Height="Auto" />
+                                                        <RowDefinition Height="Auto" />
+                                                        <RowDefinition Height="Auto" />
+                                                    </Grid.RowDefinitions>
+
+                                                    <TextBlock Text="State" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Column="2" Text="{Binding SelectedOfflineScanResult.ProcessingState}" Foreground="#E5E7EB" TextWrapping="Wrap" />
+                                                    <TextBlock Grid.Row="1" Text="Resource" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding SelectedOfflineScanResult.SignatureResourceSummary}" Foreground="#A7F3D0" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                    <TextBlock Grid.Row="2" Text="Target" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding SelectedOfflineScanResult.TargetAlertSummary}" Foreground="#FCA5A5" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                                    <TextBlock Grid.Row="3" Text="OCR Mode" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Row="3" Grid.Column="2" Text="{Binding SelectedOfflineScanResult.UsedOcrModeSummary}" Foreground="#E5E7EB" TextWrapping="Wrap" />
+                                                    <TextBlock Grid.Row="4" Text="Source" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Row="4" Grid.Column="2" Text="{Binding SelectedOfflineScanResult.OcrSourceSummary}" Foreground="#E5E7EB" TextWrapping="Wrap" />
+                                                    <TextBlock Grid.Row="5" Text="Selection" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                    <TextBlock Grid.Row="5" Grid.Column="2" Text="{Binding SelectedOfflineScanResult.SelectionModeSummary}" Foreground="#E5E7EB" TextWrapping="Wrap" />
+                                                </Grid>
+                                            </Border>
+
+                                            <TextBlock Margin="0,10,0,6" Text="OCR Text" Foreground="#94A3B8" FontWeight="SemiBold" />
+                                            <TextBox Text="{Binding SelectedOfflineScanResult.OcrText}"
+                                                     AcceptsReturn="True"
+                                                     TextWrapping="Wrap"
+                                                     VerticalScrollBarVisibility="Auto"
+                                                     IsReadOnly="True"
+                                                     MinHeight="220"
+                                                     Background="#0F172A"
+                                                     Foreground="#E5E7EB"
+                                                     BorderBrush="#334155" />
+                                        </StackPanel>
+                                    </ScrollViewer>
+                                </GroupBox>
+                            </Grid>
                         </Grid>
 
                         <Grid Grid.Row="1" Grid.Column="2">

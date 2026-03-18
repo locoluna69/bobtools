@@ -15,6 +15,10 @@ public sealed class OcrService : IOcrService, IDisposable
 {
     private const int UpscaleFactor = 2;
     private const string NumericWhitelist = "0123456789,.";
+    private const double SignatureEarlyStopScoreThreshold = 150d;
+    private const float SignatureEarlyStopConfidenceThreshold = 0.45f;
+    private const double SignatureTemplateScoreThreshold = 0.52d;
+    private const float SignatureFastPathAcceptanceConfidenceThreshold = 0.55f;
     private static readonly Regex StrictNumericValuePattern = new(@"(?<!\d)\d{1,3}(?:,\d{3})+(?!\d)", RegexOptions.Compiled);
     private static readonly Regex SignatureNumericValuePattern = new(@"(?<!\d)(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?!\d)", RegexOptions.Compiled);
     private readonly string _tessDataPath;
@@ -109,7 +113,7 @@ public sealed class OcrService : IOcrService, IDisposable
                         .ToList());
 
                     var best = MeasureStage(trace, "select_best_attempt", () => SelectBestAttempt(scoredAttempts, preferredMode));
-                    var result = MeasureStage(trace, "build_result", () => BuildResult(best, preferredMode));
+                    var result = MeasureStage(trace, "build_result", () => BuildResult(best, preferredMode, captureProfile));
 
                     if (!string.IsNullOrWhiteSpace(debugOutputDirectory))
                     {
@@ -184,6 +188,13 @@ public sealed class OcrService : IOcrService, IDisposable
 
         if (!locatedTemplate.Success)
         {
+            trace.SignatureFastPathRejectedReason = "icon-not-found";
+            return false;
+        }
+
+        if (!IsPlausibleSignatureIconLocation(bitmap.Size, locatedTemplate.Bounds, locatedTemplate.Score, out var rejectionReason))
+        {
+            trace.SignatureFastPathRejectedReason = rejectionReason;
             return false;
         }
 
@@ -191,6 +202,7 @@ public sealed class OcrService : IOcrService, IDisposable
         var candidateAttempts = new List<SignatureNumericAttempt>();
         var candidateRegions = MeasureStage(trace, "signature_candidate_regions", () => BuildSignatureValueRegions(bitmap.Size, locatedTemplate.Bounds));
         trace.SignatureCandidateRegionCount = candidateRegions.Count;
+        SignatureNumericAttempt? bestAttempt = null;
 
         MeasureStage(trace, "signature_candidate_ocr", () =>
         {
@@ -202,11 +214,15 @@ public sealed class OcrService : IOcrService, IDisposable
                     continue;
                 }
 
+                var regionStopwatch = Stopwatch.StartNew();
                 using var valueBitmap = CropBitmap(bitmap, valueRegion);
                 using var upscaled = Upscale(valueBitmap, UpscaleFactor);
                 using var grayscale = ToGrayscale(upscaled);
                 using var enhancedGrayscale = StretchContrast(grayscale);
                 var thresholdVariants = CreateThresholdVariants(grayscale, enhancedGrayscale);
+                var selectedThresholdVariants = SelectSignatureThresholdVariants(thresholdVariants);
+                var regionCandidates = new List<SignatureNumericAttempt>();
+                var attemptCount = 0;
 
                 try
                 {
@@ -221,19 +237,20 @@ public sealed class OcrService : IOcrService, IDisposable
                     {
                         RunAttempt(numericEngineLease.Engine, grayscale, PageSegMode.SingleLine, $"signature-icon-r{regionIndex}-grayscale-line"),
                         RunAttempt(numericEngineLease.Engine, grayscale, PageSegMode.SingleWord, $"signature-icon-r{regionIndex}-grayscale-word"),
-                        RunAttempt(numericEngineLease.Engine, enhancedGrayscale, PageSegMode.SingleLine, $"signature-icon-r{regionIndex}-contrast-line"),
-                        RunAttempt(numericEngineLease.Engine, enhancedGrayscale, PageSegMode.SingleWord, $"signature-icon-r{regionIndex}-contrast-word")
+                        RunAttempt(numericEngineLease.Engine, enhancedGrayscale, PageSegMode.SingleLine, $"signature-icon-r{regionIndex}-contrast-line")
                     };
 
-                    foreach (var variant in thresholdVariants)
+                    foreach (var variant in selectedThresholdVariants)
                     {
                         attempts.Add(RunAttempt(numericEngineLease.Engine, variant.Bitmap, PageSegMode.SingleLine, $"signature-icon-r{regionIndex}-{variant.Name}-line"));
-                        attempts.Add(RunAttempt(numericEngineLease.Engine, variant.Bitmap, PageSegMode.SingleWord, $"signature-icon-r{regionIndex}-{variant.Name}-word"));
                     }
 
-                    candidateAttempts.AddRange(attempts
-                        .Select(attempt => new SignatureNumericAttempt(attempt, ExtractSignatureNumericValue(attempt.NormalizedText), valueRegion))
+                    attemptCount = attempts.Count;
+
+                    regionCandidates.AddRange(attempts
+                        .Select(attempt => new SignatureNumericAttempt(attempt, ExtractSignatureNumericValue(attempt.NormalizedText), valueRegion, regionIndex))
                         .Where(candidate => !string.IsNullOrWhiteSpace(candidate.ExtractedValue)));
+                    candidateAttempts.AddRange(regionCandidates);
                 }
                 finally
                 {
@@ -242,16 +259,56 @@ public sealed class OcrService : IOcrService, IDisposable
                         variant.Bitmap.Dispose();
                     }
                 }
+
+                regionStopwatch.Stop();
+
+                var bestRegionCandidate = regionCandidates
+                    .OrderByDescending(ScoreSignatureNumericAttempt)
+                    .FirstOrDefault();
+                var regionEarlyStopTriggered = ShouldEarlyStopSignatureSearch(regionCandidates, bestRegionCandidate);
+
+                trace.RecordCandidateRegion(new OcrCandidateRegionLogEntry
+                {
+                    RegionIndex = regionIndex,
+                    X = valueRegion.X,
+                    Y = valueRegion.Y,
+                    Width = valueRegion.Width,
+                    Height = valueRegion.Height,
+                    AttemptCount = attemptCount,
+                    CandidateCount = regionCandidates.Count,
+                    ElapsedMs = regionStopwatch.Elapsed.TotalMilliseconds,
+                    BestValue = bestRegionCandidate?.ExtractedValue,
+                    BestScore = bestRegionCandidate is null ? null : ScoreSignatureNumericAttempt(bestRegionCandidate),
+                    HasStrictNumericMatch = regionCandidates.Any(candidate => StrictNumericValuePattern.IsMatch(candidate.ExtractedValue)),
+                    EarlyStopTriggered = regionEarlyStopTriggered
+                });
+
+                if (regionEarlyStopTriggered && bestRegionCandidate is not null)
+                {
+                    bestAttempt = bestRegionCandidate;
+                    trace.SignatureEarlyStopTriggered = true;
+                    trace.SignatureEarlyStopRegionIndex = regionIndex;
+                    break;
+                }
             }
         });
 
         trace.SignatureCandidateAttemptCount = candidateAttempts.Count;
+        bestAttempt ??= SelectBestSignatureNumericAttempt(candidateAttempts);
 
-        var bestAttempt = SelectBestSignatureNumericAttempt(candidateAttempts);
         if (bestAttempt is null)
         {
+            trace.SignatureFastPathRejectedReason = "no-numeric-candidates";
             return false;
         }
+
+        if (!IsAcceptableSignatureFastPathResult(bestAttempt, candidateAttempts, out rejectionReason))
+        {
+            trace.SignatureFastPathRejectedReason = rejectionReason;
+            return false;
+        }
+
+        trace.SignatureWinningRegionIndex = bestAttempt.RegionIndex;
 
         result = new OcrResult
         {
@@ -272,7 +329,7 @@ public sealed class OcrService : IOcrService, IDisposable
 
             File.WriteAllText(
                 Path.Combine(debugOutputDirectory, "00_signature_icon_match.txt"),
-                $"Icon bounds: {locatedTemplate.Bounds}\nMatch score: {locatedTemplate.Score:F4}\nSelected value region: {bestAttempt.Region}\nSelected value: {result.NormalizedText}\nUsed mode: {result.UsedMode}\nCandidate count: {candidateAttempts.Count}\n\nTop candidates:\n{candidateSummary}");
+                $"Icon bounds: {locatedTemplate.Bounds}\nMatch score: {locatedTemplate.Score:F4}\nSelected value region: {bestAttempt.Region}\nSelected region index: {bestAttempt.RegionIndex}\nSelected value: {result.NormalizedText}\nUsed mode: {result.UsedMode}\nCandidate count: {candidateAttempts.Count}\nEarly stop: {trace.SignatureEarlyStopTriggered}\nEarly stop region: {trace.SignatureEarlyStopRegionIndex}\n\nTop candidates:\n{candidateSummary}");
         }
 
         return true;
@@ -321,13 +378,59 @@ public sealed class OcrService : IOcrService, IDisposable
     private static ScoredOcrAttempt EvaluateAttempt(OcrAttempt attempt, string? captureProfile)
     {
         var baseScore = ScoreAttempt(attempt);
+        var signatureAdjustment = AnalyzeSignatureAttempt(attempt, captureProfile);
         var miningAnalysis = AnalyzeMiningAttempt(attempt, captureProfile);
 
         return new ScoredOcrAttempt(
             attempt,
-            baseScore + miningAnalysis.ScoreAdjustment,
+            baseScore + signatureAdjustment + miningAnalysis.ScoreAdjustment,
             baseScore,
             miningAnalysis);
+    }
+
+    private static double AnalyzeSignatureAttempt(OcrAttempt attempt, string? captureProfile)
+    {
+        if (!string.Equals(captureProfile, CaptureProfileCatalog.Signature, StringComparison.OrdinalIgnoreCase))
+        {
+            return 0d;
+        }
+
+        var scoreAdjustment = 0d;
+        var lines = attempt.NormalizedText
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var digitCount = attempt.NormalizedText.Count(char.IsDigit);
+        var letterCount = attempt.NormalizedText.Count(char.IsLetter);
+
+        if (SignatureCatalog.TryGetPreferredObservedValue(attempt.NormalizedText, out _, out var formattedValue))
+        {
+            scoreAdjustment += SignatureCatalog.GetMatchStrength(attempt.NormalizedText) switch
+            {
+                3 => 170d,
+                2 => 120d,
+                1 => 70d,
+                _ => 45d
+            };
+
+            scoreAdjustment += formattedValue.Contains(',', StringComparison.Ordinal) ? 30d : 0d;
+            scoreAdjustment += formattedValue.Length >= 5 ? 25d : 0d;
+        }
+
+        if (lines.Length > 2)
+        {
+            scoreAdjustment -= Math.Min(120d, (lines.Length - 2) * 18d);
+        }
+
+        if (letterCount > digitCount)
+        {
+            scoreAdjustment -= Math.Min(90d, (letterCount - digitCount) * 4d);
+        }
+
+        if (digitCount == 0)
+        {
+            scoreAdjustment -= 60d;
+        }
+
+        return scoreAdjustment;
     }
 
     private static MiningAttemptAnalysis AnalyzeMiningAttempt(OcrAttempt attempt, string? captureProfile)
@@ -490,7 +593,7 @@ public sealed class OcrService : IOcrService, IDisposable
             .Attempt;
     }
 
-    private static OcrResult BuildResult(OcrAttempt best, string? preferredMode)
+    private static OcrResult BuildResult(OcrAttempt best, string? preferredMode, string? captureProfile)
     {
         if (string.Equals(preferredMode, OcrModeCatalog.RightmostNumericValue, StringComparison.OrdinalIgnoreCase))
         {
@@ -501,6 +604,18 @@ public sealed class OcrService : IOcrService, IDisposable
                 NormalizedText = extractedNumericValue,
                 Confidence = best.Confidence,
                 UsedMode = $"{OcrModeCatalog.RightmostNumericValue}|{best.Name}"
+            };
+        }
+
+        if (string.Equals(captureProfile, CaptureProfileCatalog.Signature, StringComparison.OrdinalIgnoreCase)
+            && SignatureCatalog.TryGetPreferredObservedValue(best.NormalizedText, out _, out var formattedObservedValue))
+        {
+            return new OcrResult
+            {
+                RawText = best.RawText,
+                NormalizedText = formattedObservedValue,
+                Confidence = best.Confidence,
+                UsedMode = best.Name
             };
         }
 
@@ -536,6 +651,13 @@ public sealed class OcrService : IOcrService, IDisposable
     {
         var score = attempt.Attempt.Confidence * 100d;
         score += attempt.ExtractedValue.Length * 18d;
+        score += SignatureCatalog.GetMatchStrength(attempt.ExtractedValue) switch
+        {
+            3 => 120d,
+            2 => 80d,
+            1 => 35d,
+            _ => 0d
+        };
 
         if (attempt.ExtractedValue.Contains(',', StringComparison.Ordinal))
         {
@@ -558,6 +680,41 @@ public sealed class OcrService : IOcrService, IDisposable
         }
 
         return score;
+    }
+
+    private static bool IsAcceptableSignatureFastPathResult(SignatureNumericAttempt bestAttempt, IReadOnlyCollection<SignatureNumericAttempt> allAttempts, out string rejectionReason)
+    {
+        var hasStrictNumericMatch = StrictNumericValuePattern.IsMatch(bestAttempt.ExtractedValue);
+        var matchStrength = SignatureCatalog.GetMatchStrength(bestAttempt.ExtractedValue);
+        var voteCount = allAttempts.Count(candidate => string.Equals(candidate.ExtractedValue, bestAttempt.ExtractedValue, StringComparison.Ordinal));
+
+        if (hasStrictNumericMatch && bestAttempt.Attempt.Confidence >= SignatureFastPathAcceptanceConfidenceThreshold)
+        {
+            rejectionReason = string.Empty;
+            return true;
+        }
+
+        if (hasStrictNumericMatch && voteCount >= 2)
+        {
+            rejectionReason = string.Empty;
+            return true;
+        }
+
+        if (matchStrength >= 3
+            && bestAttempt.Attempt.Confidence >= 0.75f
+            && bestAttempt.ExtractedValue.Length >= 4
+            && voteCount >= 2)
+        {
+            rejectionReason = string.Empty;
+            return true;
+        }
+
+        rejectionReason = hasStrictNumericMatch
+            ? "weak-strict-numeric-candidate"
+            : matchStrength > 0
+                ? "approximate-signature-candidate-rejected"
+                : "low-quality-fast-path-result";
+        return false;
     }
 
     private static SignatureNumericAttempt? SelectBestSignatureNumericAttempt(IReadOnlyCollection<SignatureNumericAttempt> attempts)
@@ -585,7 +742,8 @@ public sealed class OcrService : IOcrService, IDisposable
                 group.Max(ScoreSignatureNumericAttempt),
                 group.Sum(ScoreSignatureNumericAttempt),
                 group.OrderByDescending(ScoreSignatureNumericAttempt).First()))
-            .OrderByDescending(group => group.VoteCount)
+            .OrderByDescending(group => SignatureCatalog.GetMatchStrength(group.Value))
+            .ThenByDescending(group => group.VoteCount)
             .ThenByDescending(group => group.BestScore)
             .ThenByDescending(group => group.TotalScore)
             .ThenByDescending(group => ParseNumericValue(group.Value))
@@ -599,28 +757,22 @@ public sealed class OcrService : IOcrService, IDisposable
         var regions = new List<Rectangle>();
         var startOffsets = new[]
         {
-            -iconBounds.Width,
-            -iconBounds.Width * 3 / 4,
-            -iconBounds.Width / 2,
-            -iconBounds.Width / 4,
-            -iconBounds.Width / 10,
             0,
-            iconBounds.Width / 10,
-            iconBounds.Width / 5
+            -Math.Max(2, iconBounds.Width / 8),
+            Math.Max(2, iconBounds.Width / 8),
+            -Math.Max(4, iconBounds.Width / 4)
         };
-        var topOffsets = new[] { -iconBounds.Height / 4, -iconBounds.Height / 8, 0 };
+        var topOffsets = new[] { 0, -Math.Max(2, iconBounds.Height / 10) };
         var heights = new[]
         {
             iconBounds.Height + Math.Max(4, iconBounds.Height / 2),
-            iconBounds.Height + Math.Max(8, iconBounds.Height * 3 / 4),
-            iconBounds.Height * 2
+            iconBounds.Height + Math.Max(8, iconBounds.Height * 3 / 4)
         };
         var widths = new[]
         {
             Math.Max(iconBounds.Width * 2, 48),
             Math.Max(iconBounds.Width * 3, 72),
-            Math.Max(iconBounds.Width * 4, 96),
-            Math.Max(imageSize.Width - iconBounds.Right, 0)
+            Math.Min(Math.Max(iconBounds.Width * 4, 96), Math.Max(imageSize.Width - iconBounds.Right, 0))
         };
 
         foreach (var startOffset in startOffsets)
@@ -654,6 +806,97 @@ public sealed class OcrService : IOcrService, IDisposable
         return regions;
     }
 
+    private static bool IsPlausibleSignatureIconLocation(Size imageSize, Rectangle iconBounds, double matchScore, out string rejectionReason)
+    {
+        if (iconBounds == Rectangle.Empty)
+        {
+            rejectionReason = "icon-bounds-empty";
+            return false;
+        }
+
+        if (matchScore < SignatureTemplateScoreThreshold)
+        {
+            rejectionReason = "icon-match-score-too-low";
+            return false;
+        }
+
+        if (iconBounds.Width < 6 || iconBounds.Height < 6)
+        {
+            rejectionReason = "icon-bounds-too-small";
+            return false;
+        }
+
+        if (!IsPlausibleSignatureIconBounds(imageSize, iconBounds))
+        {
+            var remainingWidth = imageSize.Width - iconBounds.Right;
+            var minimumExpectedValueWidth = Math.Max(32, Math.Min(64, imageSize.Width / 6));
+            rejectionReason = remainingWidth < minimumExpectedValueWidth
+                ? "insufficient-width-right-of-icon"
+                : "icon-position-too-low";
+            return false;
+        }
+
+        rejectionReason = string.Empty;
+        return true;
+    }
+
+    private static bool IsPlausibleSignatureIconBounds(Size imageSize, Rectangle iconBounds)
+    {
+        if (iconBounds == Rectangle.Empty || iconBounds.Width < 6 || iconBounds.Height < 6)
+        {
+            return false;
+        }
+
+        var remainingWidth = imageSize.Width - iconBounds.Right;
+        var minimumExpectedValueWidth = Math.Max(32, Math.Min(64, imageSize.Width / 6));
+        if (remainingWidth < minimumExpectedValueWidth)
+        {
+            return false;
+        }
+
+        return iconBounds.Top <= imageSize.Height * 0.7;
+    }
+
+    private static IReadOnlyList<ThresholdVariant> SelectSignatureThresholdVariants(IReadOnlyCollection<ThresholdVariant> variants)
+    {
+        var prioritizedNames = new[]
+        {
+            "contrast_threshold_otsu_minus20",
+            "base_threshold_otsu_minus20",
+            "contrast_threshold_otsu_minus15"
+        };
+
+        var selected = prioritizedNames
+            .Select(name => variants.FirstOrDefault(variant => string.Equals(variant.Name, name, StringComparison.OrdinalIgnoreCase)))
+            .Where(variant => variant is not null)
+            .Cast<ThresholdVariant>()
+            .Distinct()
+            .ToList();
+
+        if (selected.Count == 0)
+        {
+            selected = variants.Take(2).ToList();
+        }
+
+        return selected;
+    }
+
+    private static bool ShouldEarlyStopSignatureSearch(IReadOnlyCollection<SignatureNumericAttempt> regionCandidates, SignatureNumericAttempt? bestRegionCandidate)
+    {
+        if (bestRegionCandidate is null)
+        {
+            return false;
+        }
+
+        var bestScore = ScoreSignatureNumericAttempt(bestRegionCandidate);
+        var voteCount = regionCandidates.Count(candidate => string.Equals(candidate.ExtractedValue, bestRegionCandidate.ExtractedValue, StringComparison.Ordinal));
+        var hasStrictNumericMatch = StrictNumericValuePattern.IsMatch(bestRegionCandidate.ExtractedValue);
+
+        return hasStrictNumericMatch
+            && bestRegionCandidate.Attempt.Confidence >= SignatureEarlyStopConfidenceThreshold
+            && (voteCount >= 2 || bestScore >= SignatureEarlyStopScoreThreshold);
+    }
+
     private static decimal ParseNumericValue(string value)
     {
         var sanitized = value.Replace(",", string.Empty, StringComparison.Ordinal).Trim();
@@ -672,6 +915,8 @@ public sealed class OcrService : IOcrService, IDisposable
     {
         bestBounds = Rectangle.Empty;
         bestScore = double.MinValue;
+        var bestPlausibleBounds = Rectangle.Empty;
+        var bestPlausibleScore = double.MinValue;
 
         var sourceGray = ToGrayMatrix(source);
         var scales = BuildTemplateScales(source.Size, template.Size);
@@ -698,8 +943,21 @@ public sealed class OcrService : IOcrService, IDisposable
                         bestScore = score;
                         bestBounds = new Rectangle(x, y, scaledTemplate.Width, scaledTemplate.Height);
                     }
+
+                    var candidateBounds = new Rectangle(x, y, scaledTemplate.Width, scaledTemplate.Height);
+                    if (score > bestPlausibleScore && IsPlausibleSignatureIconBounds(source.Size, candidateBounds))
+                    {
+                        bestPlausibleScore = score;
+                        bestPlausibleBounds = candidateBounds;
+                    }
                 }
             }
+        }
+
+        if (bestPlausibleBounds != Rectangle.Empty)
+        {
+            bestBounds = bestPlausibleBounds;
+            bestScore = bestPlausibleScore;
         }
 
         return bestBounds != Rectangle.Empty;
@@ -1186,7 +1444,7 @@ public sealed class OcrService : IOcrService, IDisposable
     private sealed record ScoredOcrAttempt(OcrAttempt Attempt, double TotalScore, double BaseScore, MiningAttemptAnalysis MiningAnalysis);
     private sealed record MiningAttemptAnalysis(double ScoreAdjustment, string Notes, RockScan? ParsedScan);
     private sealed record SignatureNumericGroup(string Value, int VoteCount, double BestScore, double TotalScore, SignatureNumericAttempt BestAttempt);
-    private sealed record SignatureNumericAttempt(OcrAttempt Attempt, string ExtractedValue, Rectangle Region);
+    private sealed record SignatureNumericAttempt(OcrAttempt Attempt, string ExtractedValue, Rectangle Region, int RegionIndex);
     private sealed record ThresholdVariant(string Name, Bitmap Bitmap, int Threshold, bool Invert);
 
     private sealed class EngineLease : IDisposable
@@ -1241,13 +1499,25 @@ public sealed class OcrService : IOcrService, IDisposable
         public string? NumericEngineLease { get; set; }
         public int AttemptCount { get; set; }
         public int SignatureCandidateRegionCount { get; set; }
+        public int SignatureRegionsProcessedCount { get; private set; }
         public int SignatureCandidateAttemptCount { get; set; }
+        public bool SignatureEarlyStopTriggered { get; set; }
+        public int? SignatureEarlyStopRegionIndex { get; set; }
+        public int? SignatureWinningRegionIndex { get; set; }
+        public string? SignatureFastPathRejectedReason { get; set; }
         public string Status { get; private set; } = "completed";
         public string? ResultMode { get; private set; }
         public double? ResultConfidence { get; private set; }
         public int ResultTextLength { get; private set; }
         public string? Exception { get; private set; }
         public Dictionary<string, double> StageTimingsMs { get; } = [];
+        public List<OcrCandidateRegionLogEntry> CandidateRegions { get; } = [];
+
+        public void RecordCandidateRegion(OcrCandidateRegionLogEntry region)
+        {
+            CandidateRegions.Add(region);
+            SignatureRegionsProcessedCount = CandidateRegions.Count;
+        }
 
         public void SetResult(OcrResult result)
         {
@@ -1281,12 +1551,34 @@ public sealed class OcrService : IOcrService, IDisposable
                 NumericEngineLease = NumericEngineLease,
                 AttemptCount = AttemptCount,
                 SignatureCandidateRegionCount = SignatureCandidateRegionCount,
+                SignatureRegionsProcessedCount = SignatureRegionsProcessedCount,
                 SignatureCandidateAttemptCount = SignatureCandidateAttemptCount,
+                SignatureEarlyStopTriggered = SignatureEarlyStopTriggered,
+                SignatureEarlyStopRegionIndex = SignatureEarlyStopRegionIndex,
+                SignatureWinningRegionIndex = SignatureWinningRegionIndex,
+                SignatureFastPathRejectedReason = SignatureFastPathRejectedReason,
+                MaxCandidateAttemptsInRegion = CandidateRegions.Count == 0 ? null : CandidateRegions.Max(region => region.AttemptCount),
+                AverageCandidateAttemptsPerProcessedRegion = CandidateRegions.Count == 0 ? null : CandidateRegions.Average(region => region.AttemptCount),
                 ResultMode = ResultMode,
                 ResultConfidence = ResultConfidence,
                 ResultTextLength = ResultTextLength,
                 Exception = Exception,
-                StageTimingsMs = new Dictionary<string, double>(StageTimingsMs)
+                StageTimingsMs = new Dictionary<string, double>(StageTimingsMs),
+                CandidateRegions = CandidateRegions.Select(region => new OcrCandidateRegionLogEntry
+                {
+                    RegionIndex = region.RegionIndex,
+                    X = region.X,
+                    Y = region.Y,
+                    Width = region.Width,
+                    Height = region.Height,
+                    AttemptCount = region.AttemptCount,
+                    CandidateCount = region.CandidateCount,
+                    ElapsedMs = region.ElapsedMs,
+                    BestValue = region.BestValue,
+                    BestScore = region.BestScore,
+                    HasStrictNumericMatch = region.HasStrictNumericMatch,
+                    EarlyStopTriggered = region.EarlyStopTriggered
+                }).ToList()
             };
         }
     }
