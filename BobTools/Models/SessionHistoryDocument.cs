@@ -49,6 +49,7 @@ public sealed class SessionHistoryEntry
 public sealed class ScanSessionPayload
 {
     public string Summary { get; set; } = string.Empty;
+    public string CorrectValue { get; set; } = string.Empty;
     public string? MatchedResource { get; set; }
     public bool IsTargetMatch { get; set; }
     public List<string> SelectedTargets { get; set; } = [];

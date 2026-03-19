@@ -449,7 +449,12 @@
                                                Text="Checked resources are highlighted in the live queue when OCR matches them."
                                                TextWrapping="Wrap" />
                                 </StackPanel>
-                                <TextBlock Margin="0,8,0,0" Foreground="#E5E7EB" Text="{Binding LiveScanQueueSummary}" TextWrapping="Wrap" />
+                                    <WrapPanel Margin="0,8,0,0" VerticalAlignment="Center">
+                                        <TextBlock Margin="0,4,12,0" Foreground="#E5E7EB" Text="{Binding LiveScanQueueSummary}" TextWrapping="Wrap" />
+                                        <Button Padding="10,4"
+                                                Command="{Binding ExportScanTrainingPackageCommand}"
+                                                Content="Export Training Zip" />
+                                    </WrapPanel>
                                 <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" Text="{Binding CurrentSessionId, StringFormat=Session: {0}}" TextWrapping="Wrap" />
                             </StackPanel>
                             <StackPanel>
@@ -544,8 +549,13 @@
                                                             <TextBlock Foreground="#A7F3D0" FontWeight="SemiBold" Text="{Binding SignatureResourceSummary}" TextWrapping="Wrap" />
                                                             <TextBlock Margin="0,4,0,0" Foreground="#94A3B8" Text="{Binding OcrSourceSummary}" TextWrapping="Wrap" />
                                                             <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" Text="{Binding UsedOcrModeSummary, StringFormat=OCR Mode: {0}}" TextWrapping="Wrap" />
-                                                            <TextBox Margin="0,10,0,0"
-                                                                     MinHeight="170"
+
+                                                            <TextBlock Margin="0,10,0,0"
+                                                                       Foreground="#94A3B8"
+                                                                       FontWeight="SemiBold"
+                                                                       Text="Detected value" />
+                                                            <TextBox Margin="0,4,0,0"
+                                                                     MinHeight="88"
                                                                      Text="{Binding OcrText}"
                                                                      AcceptsReturn="True"
                                                                      TextWrapping="Wrap"
@@ -554,6 +564,21 @@
                                                                      Background="#0F172A"
                                                                      Foreground="#E5E7EB"
                                                                      BorderBrush="#334155" />
+
+                                                            <TextBlock Margin="0,10,0,0"
+                                                                       Foreground="#94A3B8"
+                                                                       FontWeight="SemiBold"
+                                                                       Text="Correct value" />
+                                                            <TextBox Margin="0,4,0,0"
+                                                                     Text="{Binding CorrectValue, UpdateSourceTrigger=PropertyChanged}"
+                                                                     Background="#0F172A"
+                                                                     Foreground="#E5E7EB"
+                                                                     BorderBrush="#334155"
+                                                                     ToolTip="Edit this value when OCR is wrong. Changes are auto-saved for training handoff." />
+                                                            <TextBlock Margin="0,6,0,0"
+                                                                       Foreground="#94A3B8"
+                                                                       FontSize="11"
+                                                                       Text="{Binding AutoSaveStatus, StringFormat=Label status: {0}}" />
                                                         </StackPanel>
                                                     </Grid>
                                                 </Border>

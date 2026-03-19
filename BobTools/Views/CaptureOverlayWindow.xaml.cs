@@ -28,9 +28,6 @@ public partial class CaptureOverlayWindow : Window
     public void SetCaptureProfile(string captureProfile)
     {
         _captureProfile = captureProfile;
-        SignatureGuide.Visibility = CaptureProfileCatalog.UsesFixedRegion(captureProfile)
-            ? Visibility.Visible
-            : Visibility.Collapsed;
     }
 
     public void RefreshPosition()

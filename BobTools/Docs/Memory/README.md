@@ -27,3 +27,4 @@ Use this folder to keep session-to-session context that is expensive to rediscov
 - `2026-03-15-handoff.md` — initial project history and current-state summary.
 - `2026-03-17-ocr-performance-tuning.md` — detailed notes on signature OCR instrumentation, tuning, drift observations, and remaining gaps.
 - `2026-03-18-signature-recognizer-plan.md` — concrete plan for building and integrating a signature-specific recognizer for BobTools.
+- `2026-03-18-bobtools-export-training-guide.md` — step-by-step workflow for turning BobTools user export zips into reviewed training manifests.

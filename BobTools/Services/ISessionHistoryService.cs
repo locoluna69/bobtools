@@ -8,4 +8,6 @@ public interface ISessionHistoryService
     void Initialize();
     void UpsertSessionMetadata(SessionMetadata metadata);
     void UpsertEntry(SessionHistoryEntry entry);
+    SessionHistoryDocument LoadCurrentDocument();
+    IReadOnlyList<SessionHistoryDocument> LoadAllDocuments();
 }
