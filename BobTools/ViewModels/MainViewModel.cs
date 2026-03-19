@@ -72,7 +72,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string sessionLocationSearchText = string.Empty;
     [ObservableProperty] private MiningLocationOption? selectedSessionLocation;
     [ObservableProperty] private string sessionContextSummary = "Session context: add RSI handle, then select ship, system, and location.";
-    [ObservableProperty] private string hotkeyTargetSummary = "Alt+B target: Scan capture";
+    [ObservableProperty] private string hotkeyTargetSummary = $"{HotkeyCatalog.RecommendedDisplay} target: Scan capture";
+    [ObservableProperty] private uint selectedHotkeyModifiers = HotkeyCatalog.DefaultModifiers;
+    [ObservableProperty] private uint selectedHotkeyVirtualKey = HotkeyCatalog.DefaultVirtualKey;
+    [ObservableProperty] private string configuredHotkeySummary = $"Configured hotkey: {HotkeyCatalog.RecommendedDisplay}";
+    [ObservableProperty] private string hotkeyRegistrationStatus = "Hotkey registration is waiting for the main window handle.";
+    [ObservableProperty] private string recommendedHotkeySummary = $"Recommended for Star Citizen overlays: {HotkeyCatalog.RecommendedDisplay}";
+    [ObservableProperty] private bool isRecordingHotkey;
+    [ObservableProperty] private string hotkeyRecorderSummary = "Click Record Shortcut, then press the key combination you want BobTools to use.";
+    [ObservableProperty] private string hotkeyRecorderButtonLabel = "Record Shortcut";
     [ObservableProperty] private string offlineSelectedCaptureProfile = CaptureProfileCatalog.Signature;
     [ObservableProperty] private ImageSource? offlinePreviewImage;
     [ObservableProperty] private string offlineImagePath = "Drop an image here to test Scan or Mining OCR.";
@@ -108,6 +116,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public ICommand OpenDebugFolderCommand { get; }
     public ICommand LoadLiveMiningFolderCommand { get; }
     public ICommand ExportScanTrainingPackageCommand { get; }
+    public ICommand ApplyRecommendedHotkeyCommand { get; }
+    public ICommand ToggleHotkeyRecordingCommand { get; }
     public ICommand ReplayDebugFolderCommand { get; }
     public ICommand RunOfflineTestCommand { get; }
     public IAsyncRelayCommand SaveOfflineMiningEditsCommand { get; }
@@ -118,6 +128,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public IReadOnlyList<OcrModeOption> OcrModeOptions { get; } = OcrModeCatalog.Options;
     public IReadOnlyList<CaptureProfileOption> WorkflowModeOptions { get; } = WorkflowModeCatalog.Options;
     public IReadOnlyList<CaptureProfileOption> CaptureProfileOptions { get; } = CaptureProfileCatalog.Options;
+    public IReadOnlyList<HotkeyModifierOption> HotkeyModifierOptions { get; } = HotkeyCatalog.ModifierOptions;
+    public IReadOnlyList<HotkeyKeyOption> HotkeyKeyOptions { get; } = HotkeyCatalog.KeyOptions;
     public ObservableCollection<OfflineInputImageItem> OfflineInputImages { get; } = new();
     public ObservableCollection<OfflineScanResultItem> OfflineScanResults { get; } = new();
     public ObservableCollection<OfflineMiningResultItem> OfflineMiningResults { get; } = new();
@@ -147,6 +159,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _settings = _settingsService.Load();
         saveDebugImages = _settings.SaveDebugImages;
         captureOnlyMode = _settings.CaptureOnlyMode;
+        selectedHotkeyModifiers = _settings.HotkeyModifiers;
+        selectedHotkeyVirtualKey = _settings.HotkeyVirtualKey;
         lifetimeSignatureCount = _settings.LifetimeSignatureCount;
         lifetimeRockCount = _settings.LifetimeRockCount;
         lifetimeHighValueOreCount = _settings.LifetimeHighValueOreCount;
@@ -203,6 +217,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         LoadPersistedLiveResults();
         UpdateCaptureRegionSummaries();
         UpdateLiveScanQueueSummary();
+        UpdateConfiguredHotkeySummary();
         UpdateHotkeyTargetSummary();
         UpdateCaptureOverlay();
 
@@ -216,6 +231,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OpenDebugFolderCommand = new RelayCommand(OpenDebugFolder);
         LoadLiveMiningFolderCommand = new AsyncRelayCommand(LoadLiveMiningFolderAsync);
         ExportScanTrainingPackageCommand = new RelayCommand(ExportScanTrainingPackage);
+        ApplyRecommendedHotkeyCommand = new RelayCommand(ApplyRecommendedHotkey);
+        ToggleHotkeyRecordingCommand = new RelayCommand(ToggleHotkeyRecording);
         ReplayDebugFolderCommand = new AsyncRelayCommand(ReplayDebugFolderAsync);
         RunOfflineTestCommand = new AsyncRelayCommand(RunOfflineTestAsync);
         SaveOfflineMiningEditsCommand = new AsyncRelayCommand(SaveOfflineMiningEditsAsync, () => SelectedOfflineMiningResult is not null);
@@ -230,7 +247,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         var captureProfile = WorkflowModeCatalog.GetCaptureProfile(SelectedWorkflowMode);
         if (string.IsNullOrWhiteSpace(captureProfile))
         {
-            Status = "Offline mode does not use Alt+B capture. Use Queue Folder to add mining images for processing.";
+            Status = $"Offline mode does not use {HotkeyCatalog.Format(SelectedHotkeyModifiers, SelectedHotkeyVirtualKey)} capture. Use Queue Folder to add mining images for processing.";
             return Task.CompletedTask;
         }
 
@@ -962,6 +979,41 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _settings.CaptureOnlyMode = value;
         _settingsService.Save(_settings);
         UpdateHotkeyTargetSummary();
+    }
+
+    partial void OnSelectedHotkeyModifiersChanged(uint value)
+    {
+        _settings.HotkeyModifiers = value;
+        _settingsService.Save(_settings);
+        UpdateConfiguredHotkeySummary();
+        UpdateHotkeyTargetSummary();
+
+        if (!IsRecordingHotkey)
+        {
+            HotkeyRecorderSummary = $"Shortcut changed to {HotkeyCatalog.Format(SelectedHotkeyModifiers, SelectedHotkeyVirtualKey)}.";
+        }
+    }
+
+    partial void OnSelectedHotkeyVirtualKeyChanged(uint value)
+    {
+        _settings.HotkeyVirtualKey = value;
+        _settingsService.Save(_settings);
+        UpdateConfiguredHotkeySummary();
+        UpdateHotkeyTargetSummary();
+
+        if (!IsRecordingHotkey)
+        {
+            HotkeyRecorderSummary = $"Shortcut changed to {HotkeyCatalog.Format(SelectedHotkeyModifiers, SelectedHotkeyVirtualKey)}.";
+        }
+    }
+
+    partial void OnIsRecordingHotkeyChanged(bool value)
+    {
+        HotkeyRecorderButtonLabel = value ? "Cancel Recording" : "Record Shortcut";
+        if (value)
+        {
+            HotkeyRecorderSummary = "Recording shortcut now. Press a supported combination, or press Escape to cancel.";
+        }
     }
 
     partial void OnSelectedOcrModeChanged(string value)
@@ -1835,15 +1887,69 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void UpdateHotkeyTargetSummary()
     {
+        var hotkeyDisplay = HotkeyCatalog.Format(SelectedHotkeyModifiers, SelectedHotkeyVirtualKey);
         HotkeyTargetSummary = SelectedWorkflowMode switch
         {
-            WorkflowModeCatalog.Scanning when CaptureOnlyMode => "Alt+B target: raw Scan capture",
-            WorkflowModeCatalog.Scanning => "Alt+B target: Scan capture",
-            WorkflowModeCatalog.Mining when CaptureOnlyMode => "Alt+B target: raw Mining capture",
-            WorkflowModeCatalog.Mining => "Alt+B target: Mining queue",
-            WorkflowModeCatalog.Offline => "Alt+B disabled in Offline mode",
-            _ => "Alt+B target: unknown"
+            WorkflowModeCatalog.Scanning when CaptureOnlyMode => $"{hotkeyDisplay} target: raw Scan capture",
+            WorkflowModeCatalog.Scanning => $"{hotkeyDisplay} target: Scan capture",
+            WorkflowModeCatalog.Mining when CaptureOnlyMode => $"{hotkeyDisplay} target: raw Mining capture",
+            WorkflowModeCatalog.Mining => $"{hotkeyDisplay} target: Mining queue",
+            WorkflowModeCatalog.Offline => $"{hotkeyDisplay} disabled in Offline mode",
+            _ => $"{hotkeyDisplay} target: unknown"
         };
+    }
+
+    private void UpdateConfiguredHotkeySummary()
+    {
+        ConfiguredHotkeySummary = $"Configured hotkey: {HotkeyCatalog.Format(SelectedHotkeyModifiers, SelectedHotkeyVirtualKey)}";
+        RecommendedHotkeySummary = $"Recommended for Star Citizen overlays: {HotkeyCatalog.RecommendedDisplay}";
+    }
+
+    private void ApplyRecommendedHotkey()
+    {
+        SelectedHotkeyModifiers = HotkeyCatalog.RecommendedModifiers;
+        SelectedHotkeyVirtualKey = HotkeyCatalog.RecommendedVirtualKey;
+        HotkeyRecorderSummary = $"Recommended shortcut applied: {HotkeyCatalog.RecommendedDisplay}.";
+    }
+
+    public void SetHotkeyRegistrationStatus(string message)
+    {
+        HotkeyRegistrationStatus = message;
+    }
+
+    public void ToggleHotkeyRecording()
+    {
+        if (IsRecordingHotkey)
+        {
+            CancelHotkeyRecording("Hotkey recording canceled.");
+            return;
+        }
+
+        IsRecordingHotkey = true;
+        Status = "Press the shortcut you want to record for BobTools.";
+    }
+
+    public void CompleteHotkeyRecording(uint modifiers, uint virtualKey)
+    {
+        SelectedHotkeyModifiers = modifiers;
+        SelectedHotkeyVirtualKey = virtualKey;
+        IsRecordingHotkey = false;
+
+        var formattedHotkey = HotkeyCatalog.Format(modifiers, virtualKey);
+        HotkeyRecorderSummary = $"Recorded shortcut: {formattedHotkey}.";
+        Status = $"Hotkey updated to {formattedHotkey}.";
+    }
+
+    public void CancelHotkeyRecording(string message)
+    {
+        IsRecordingHotkey = false;
+        HotkeyRecorderSummary = message;
+        Status = message;
+    }
+
+    public void SetHotkeyRecorderSummary(string message)
+    {
+        HotkeyRecorderSummary = message;
     }
 
     private void UpdateOfflineSelectionPreview()

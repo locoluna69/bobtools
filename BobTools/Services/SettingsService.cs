@@ -10,8 +10,8 @@ public sealed class SettingsService : ISettingsService
 {
     private const uint LegacyDefaultModifiers = 0x0002 | 0x0004;
     private const uint LegacyDefaultVirtualKey = 0x51;
-    private const uint NewDefaultModifiers = 0x0001;
-    private const uint NewDefaultVirtualKey = 0x42;
+    private const uint PriorDefaultModifiers = 0x0001;
+    private const uint PriorDefaultVirtualKey = 0x42;
     private readonly string _settingsPath;
 
     public SettingsService(string settingsPath)
@@ -29,10 +29,17 @@ public sealed class SettingsService : ISettingsService
         var json = File.ReadAllText(_settingsPath);
         var settings = JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
 
-        if (settings.HotkeyModifiers == LegacyDefaultModifiers && settings.HotkeyVirtualKey == LegacyDefaultVirtualKey)
+        if ((settings.HotkeyModifiers == LegacyDefaultModifiers && settings.HotkeyVirtualKey == LegacyDefaultVirtualKey)
+            || (settings.HotkeyModifiers == PriorDefaultModifiers && settings.HotkeyVirtualKey == PriorDefaultVirtualKey))
         {
-            settings.HotkeyModifiers = NewDefaultModifiers;
-            settings.HotkeyVirtualKey = NewDefaultVirtualKey;
+            settings.HotkeyModifiers = HotkeyCatalog.DefaultModifiers;
+            settings.HotkeyVirtualKey = HotkeyCatalog.DefaultVirtualKey;
+        }
+
+        if (!HotkeyCatalog.IsSupported(settings.HotkeyModifiers, settings.HotkeyVirtualKey))
+        {
+            settings.HotkeyModifiers = HotkeyCatalog.DefaultModifiers;
+            settings.HotkeyVirtualKey = HotkeyCatalog.DefaultVirtualKey;
         }
 
         if (!OcrModeCatalog.IsValid(settings.OcrMode))

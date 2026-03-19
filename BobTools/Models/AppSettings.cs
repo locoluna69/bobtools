@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using BobTools.Utils;
 
 namespace BobTools.Models;
 
@@ -7,8 +8,8 @@ public sealed class AppSettings
     public CaptureRegion CaptureRegion { get; set; } = new();
     public CaptureRegion SignatureCaptureRegion { get; set; } = new();
     public CaptureRegion MiningCaptureRegion { get; set; } = new();
-    public uint HotkeyModifiers { get; set; } = 0x0001; // ALT
-    public uint HotkeyVirtualKey { get; set; } = 0x42; // B
+    public uint HotkeyModifiers { get; set; } = HotkeyCatalog.DefaultModifiers;
+    public uint HotkeyVirtualKey { get; set; } = HotkeyCatalog.DefaultVirtualKey;
     public bool SaveDebugImages { get; set; }
     public bool CaptureOnlyMode { get; set; }
     public string OcrMode { get; set; } = "auto";
