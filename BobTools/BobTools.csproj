@@ -20,6 +20,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="Tools\SignatureDatasetExporter\**\*.cs" />
+    <EmbeddedResource Remove="Tools\SignatureDatasetExporter\**\*" />
+    <None Remove="Tools\SignatureDatasetExporter\**\*" />
+    <Page Remove="Tools\SignatureDatasetExporter\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
     <None Update="Assets\tessdata\README.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

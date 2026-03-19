@@ -1,0 +1,2 @@
+﻿id,source_image_path,raw_image_path,crop_image_path,expected_text,expected_resource,is_hard_case,split,label_source,crop_status,crop_strategy,crop_bounds,notes
+"scan_0020","I:\gh\BobTools\BobTools\Assets\TestImages\scanning\scan_20260318_110509_424_0e031a9c.png","data/raw/scan_20260318_110509_424_0e031a9c.png","data/crops/scan_0020.png","","","false","val","manual-needed","ok","icon-ocr-search:0.8961-grayscale-line","20,28,102,80","Provide expected label manually or exclude from training. | Best OCR candidate for crop region was 20."

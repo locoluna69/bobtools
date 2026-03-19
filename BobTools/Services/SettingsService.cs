@@ -57,7 +57,14 @@ public sealed class SettingsService : ISettingsService
                 : WorkflowModeCatalog.Scanning;
         }
 
+        settings.LastShip ??= string.Empty;
+        settings.LastStarSystem ??= string.Empty;
+        settings.LastLocationKey ??= string.Empty;
+        settings.RsiHandle ??= string.Empty;
         settings.SelectedScanResources ??= [];
+        settings.LifetimeSignatureCount = Math.Max(0, settings.LifetimeSignatureCount);
+        settings.LifetimeRockCount = Math.Max(0, settings.LifetimeRockCount);
+        settings.LifetimeHighValueOreCount = Math.Max(0, settings.LifetimeHighValueOreCount);
 
         return settings;
     }

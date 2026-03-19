@@ -4,7 +4,7 @@ A WPF/.NET 8 Windows overlay-style OCR helper for BobTools workflows.
 
 ## Included
 - WPF desktop shell
-- Global hotkey registration (`Ctrl+Shift+Q` by default)
+- Global hotkey registration (`Alt+B` by default)
 - Full-screen region selector
 - Small-region screen capture
 - OCR service wrapper using Tesseract
@@ -33,8 +33,14 @@ A WPF/.NET 8 Windows overlay-style OCR helper for BobTools workflows.
 3. Put `eng.traineddata` in the project folder under `Assets/tessdata`.
 4. Build and run.
 5. Click **Set Signature** or **Set Mining** and drag over the target UI area.
-6. Press `Ctrl+Shift+Q` or use the capture controls in the app.
+6. Press `Alt+B` or use the capture controls in the app.
 7. Edit OCR output and click **Accept**.
+
+## Signature dataset workflow
+- Raw scan captures can be collected with the app's `Capture only` mode.
+- To promote labeled raw captures into the signature fixture set, use `BobTools/Tools/SignatureDatasetExporter` with `--ingest-csv`.
+- The ingest CSV should contain `source_image_path,expected_text,destination_file_name`.
+- Example: `dotnet run --project .\BobTools\Tools\SignatureDatasetExporter\SignatureDatasetExporter.csproj -- --ingest-csv .\BobTools\Tools\SignatureDatasetExporter\ingest-template.csv --ingest-only --overwrite`
 
 ## Good next improvements
 - Add multiple named scan regions

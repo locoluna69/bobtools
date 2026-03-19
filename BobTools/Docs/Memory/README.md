@@ -26,3 +26,4 @@ Use this folder to keep session-to-session context that is expensive to rediscov
 - `CURRENT_STATE.md` — short always-current snapshot of the project.
 - `2026-03-15-handoff.md` — initial project history and current-state summary.
 - `2026-03-17-ocr-performance-tuning.md` — detailed notes on signature OCR instrumentation, tuning, drift observations, and remaining gaps.
+- `2026-03-18-signature-recognizer-plan.md` — concrete plan for building and integrating a signature-specific recognizer for BobTools.

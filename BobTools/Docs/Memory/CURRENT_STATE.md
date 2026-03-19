@@ -45,6 +45,9 @@ BobTools is a Windows WPF overlay app for Star Citizen that:
 - Mining OCR now normalizes parsed material names against `Assets/data/commodities.json`, filtered to extractable mining commodities and still tolerant of common OCR/spelling drift.
 - Offline mining now supports a queued multi-image workflow: drop multiple images, run OCR across the batch, inspect the selected OCR image/debug artifact, edit the structured scan result inline, add or delete element rows, and save corrected JSON/CSV output.
 - Offline mining results now track unsaved edits and visually highlight the save buttons when field or element-row changes need to be persisted.
+- Session context now includes a persisted `RSI handle` alongside ship, system, and location; it is required before capture/processing and is written into saved PNG metadata.
+- The app now also attempts to load and display the public RSI citizen profile image for the current RSI handle, caching it under `LocalAppData/BobTools/ProfileImages` when the profile exposes a public avatar.
+- The top-left header now includes persisted lifetime counters for completed `Signatures`, meaningful `Rocks`, and `High Quality` ore entries. High Quality increments for each mining composition entry with quality `>= 900`.
 
 ## Important files
 
@@ -89,6 +92,7 @@ BobTools is a Windows WPF overlay app for Star Citizen that:
 - Mining scan CSV: `LocalAppData/BobTools/RockScans/rock_scans.csv`
 - Mining scan JSON: saved into the matching debug capture folder when available, otherwise `LocalAppData/BobTools/RockScans/Json`
 - Mining session ID: generated once when the app starts and reused until the app closes
+- Saved PNGs written by BobTools include `BobTools.*` text metadata such as session ID, RSI handle, ship, system, and location.
 - Signature lookup data: [Assets/data/signatures.csv](Assets/data/signatures.csv)
 - Mining material reference data: [Assets/data/commodities.json](Assets/data/commodities.json)
 - Signature icon template: [Assets/images/signature_icon.png](Assets/images/signature_icon.png)

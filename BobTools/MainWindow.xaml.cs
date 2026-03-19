@@ -34,7 +34,8 @@ public partial class MainWindow : Window
             settingsService,
             sessionHistoryService,
             new ScreenCaptureService(),
-            new OcrService(tessDataPath));
+            new OcrService(tessDataPath),
+            new RsiProfileImageService(Path.Combine(appData, "ProfileImages")));
 
         DataContext = _viewModel;
         Loaded += MainWindow_Loaded;

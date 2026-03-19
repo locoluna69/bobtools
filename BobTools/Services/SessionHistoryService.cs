@@ -32,6 +32,17 @@ public sealed class SessionHistoryService : ISessionHistoryService
         }
     }
 
+    public void UpsertSessionMetadata(SessionMetadata metadata)
+    {
+        lock (_syncRoot)
+        {
+            var document = LoadDocument();
+            document.Metadata = metadata ?? new SessionMetadata();
+            document.LastUpdatedUtc = DateTime.UtcNow;
+            SaveDocument(document);
+        }
+    }
+
     public void UpsertEntry(SessionHistoryEntry entry)
     {
         lock (_syncRoot)
@@ -64,6 +75,7 @@ public sealed class SessionHistoryService : ISessionHistoryService
             var json = File.ReadAllText(SessionFilePath);
             var document = JsonSerializer.Deserialize<SessionHistoryDocument>(json, _jsonOptions) ?? CreateDocument();
             document.SessionId = string.IsNullOrWhiteSpace(document.SessionId) ? _sessionId : document.SessionId;
+            document.Metadata ??= new SessionMetadata();
             document.Events ??= [];
             return document;
         }
@@ -76,6 +88,7 @@ public sealed class SessionHistoryService : ISessionHistoryService
     private void SaveDocument(SessionHistoryDocument document)
     {
         document.SessionId = _sessionId;
+        document.Metadata ??= new SessionMetadata();
         document.Events ??= [];
 
         var directory = Path.GetDirectoryName(SessionFilePath)!;
@@ -95,6 +108,7 @@ public sealed class SessionHistoryService : ISessionHistoryService
             SessionId = _sessionId,
             CreatedUtc = now,
             LastUpdatedUtc = now,
+            Metadata = new SessionMetadata(),
             Events = []
         };
     }

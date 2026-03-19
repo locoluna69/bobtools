@@ -4,12 +4,14 @@ using BobTools.Utils;
 using System;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Controls;
 
 namespace BobTools.Views;
 
 public partial class CaptureOverlayWindow : Window
 {
     private CaptureRegion _region = new();
+    private string _captureProfile = CaptureProfileCatalog.Signature;
 
     public CaptureOverlayWindow()
     {
@@ -21,6 +23,14 @@ public partial class CaptureOverlayWindow : Window
     {
         _region = region;
         RefreshPosition();
+    }
+
+    public void SetCaptureProfile(string captureProfile)
+    {
+        _captureProfile = captureProfile;
+        SignatureGuide.Visibility = CaptureProfileCatalog.UsesFixedRegion(captureProfile)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     public void RefreshPosition()

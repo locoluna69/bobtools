@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace BobTools.Models;
 
 public sealed class SessionHistoryDocument
@@ -5,7 +7,24 @@ public sealed class SessionHistoryDocument
     public string SessionId { get; set; } = string.Empty;
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public DateTime LastUpdatedUtc { get; set; } = DateTime.UtcNow;
+    public SessionMetadata Metadata { get; set; } = new();
     public List<SessionHistoryEntry> Events { get; set; } = [];
+}
+
+public sealed class SessionMetadata
+{
+    public string RsiHandle { get; set; } = string.Empty;
+    public string Ship { get; set; } = string.Empty;
+    public string StarSystem { get; set; } = string.Empty;
+    public string LocationKey { get; set; } = string.Empty;
+    public string LocationName { get; set; } = string.Empty;
+    public string LocationPath { get; set; } = string.Empty;
+
+    [JsonPropertyName("miningShip")]
+    public string LegacyMiningShip
+    {
+        set => Ship = value ?? string.Empty;
+    }
 }
 
 public sealed class SessionHistoryEntry

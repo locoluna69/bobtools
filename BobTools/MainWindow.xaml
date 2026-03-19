@@ -40,16 +40,110 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                              <Image Width="92"
-                                  Height="92"
-                                  Margin="0,0,8,0"
-                           Stretch="Uniform"
-                           Source="pack://siteoforigin:,,,/Assets/images/BOBSL_logo_blue.png" />
-                    <StackPanel VerticalAlignment="Center">
-                        <TextBlock FontSize="22" FontWeight="Bold" Foreground="White" Text="BobTools" />
-                        <TextBlock Margin="0,2,0,0" Foreground="#BBD5E1" Text="Top overlay — drag frame to reposition." />
+                <StackPanel VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                  <Image Width="92"
+                                      Height="92"
+                                      Margin="0,0,8,0"
+                               Stretch="Uniform"
+                               Source="pack://siteoforigin:,,,/Assets/images/BOBSL_logo_blue.png" />
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock FontSize="22" FontWeight="Bold" Foreground="White" Text="BobTools" />
+                            <TextBlock Margin="0,2,0,0" Foreground="#BBD5E1" Text="Top overlay — drag frame to reposition." />
+                        </StackPanel>
                     </StackPanel>
+                    <Border Margin="0,12,0,0"
+                            Padding="12"
+                            CornerRadius="12"
+                            BorderThickness="1"
+                            BorderBrush="#3B4F67">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#A30B1220" Offset="0" />
+                                <GradientStop Color="#CC10233B" Offset="0.55" />
+                                <GradientStop Color="#CC09131F" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <StackPanel>
+                            <DockPanel LastChildFill="False">
+                                <TextBlock DockPanel.Dock="Left"
+                                           Foreground="#7DD3FC"
+                                           FontSize="11"
+                                           FontWeight="Bold"
+                                           Text="BOB STATS" />
+                                <Border DockPanel.Dock="Right"
+                                        Padding="8,3"
+                                        CornerRadius="999"
+                                        Background="#1E293B"
+                                        BorderBrush="#334155"
+                                        BorderThickness="1">
+                                    <TextBlock Foreground="#CBD5E1"
+                                               FontSize="10"
+                                               Text="lifetime totals" />
+                                </Border>
+                            </DockPanel>
+
+                            <TextBlock Margin="0,6,0,0"
+                                       Foreground="#94A3B8"
+                                       FontSize="11"
+                                       Text="Track the haul. Count the wins. Chase better numbers every run." />
+
+                            <Grid Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0"
+                                        Padding="10"
+                                        CornerRadius="10"
+                                        BorderThickness="1"
+                                        BorderBrush="#1D4ED8"
+                                        Background="#66121C2C"
+                                        ToolTip="Total completed scan/signature OCR results across all sessions.">
+                                    <StackPanel>
+                                        <Rectangle Height="3" RadiusX="1.5" RadiusY="1.5" Fill="#38BDF8" HorizontalAlignment="Stretch" />
+                                        <TextBlock Margin="0,8,0,0" Foreground="#93C5FD" FontSize="11" FontWeight="SemiBold" Text="SIGNATURES" />
+                                        <TextBlock Margin="0,4,0,0" Foreground="White" FontSize="24" FontWeight="Bold" Text="{Binding LifetimeSignatureCount}" />
+                                        <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" FontSize="10" Text="Completed scan reads" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Grid.Column="2"
+                                        Padding="10"
+                                        CornerRadius="10"
+                                        BorderThickness="1"
+                                        BorderBrush="#0F766E"
+                                        Background="#6611221F"
+                                        ToolTip="Total completed mining scans with meaningful rock data across all sessions.">
+                                    <StackPanel>
+                                        <Rectangle Height="3" RadiusX="1.5" RadiusY="1.5" Fill="#2DD4BF" HorizontalAlignment="Stretch" />
+                                        <TextBlock Margin="0,8,0,0" Foreground="#99F6E4" FontSize="11" FontWeight="SemiBold" Text="ROCKS" />
+                                        <TextBlock Margin="0,4,0,0" Foreground="White" FontSize="24" FontWeight="Bold" Text="{Binding LifetimeRockCount}" />
+                                        <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" FontSize="10" Text="Parsed mining finds" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Grid.Column="4"
+                                        Padding="10"
+                                        CornerRadius="10"
+                                        BorderThickness="1"
+                                        BorderBrush="#B45309"
+                                        Background="#6623130B"
+                                        ToolTip="Total ore entries found with quality greater than or equal to 900 across all sessions.">
+                                    <StackPanel>
+                                        <Rectangle Height="3" RadiusX="1.5" RadiusY="1.5" Fill="#F59E0B" HorizontalAlignment="Stretch" />
+                                        <TextBlock Margin="0,8,0,0" Foreground="#FCD34D" FontSize="11" FontWeight="SemiBold" Text="HIGH QUALITY" />
+                                        <TextBlock Margin="0,4,0,0" Foreground="White" FontSize="24" FontWeight="Bold" Text="{Binding LifetimeHighValueOreCount}" />
+                                        <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" FontSize="10" Text="Ore entries at 900+" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
 
                 <Border Grid.Column="2" Padding="10" CornerRadius="8" Background="#8A0F172A" BorderBrush="#334155" BorderThickness="1">
@@ -62,11 +156,72 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel>
-                            <TextBlock FontWeight="Bold" Foreground="White" Text="Capture" />
-                            <TextBlock Margin="0,4,0,0" Foreground="#D1D5DB" Text="{Binding SignatureCaptureRegionSummary, StringFormat=Scan: {0}}" />
-                            <TextBlock Margin="0,2,0,0" Foreground="#D1D5DB" Text="{Binding MiningCaptureRegionSummary, StringFormat=Mining: {0}}" />
-                        </StackPanel>
+                        <Border Width="170"
+                                Padding="10"
+                                CornerRadius="12"
+                                BorderThickness="1"
+                                BorderBrush="#1D4ED8"
+                                Background="#66121C2C">
+                            <StackPanel>
+                                <Rectangle Height="3"
+                                           RadiusX="1.5"
+                                           RadiusY="1.5"
+                                           Fill="#38BDF8"
+                                           HorizontalAlignment="Stretch" />
+                                <TextBlock Margin="0,8,0,0"
+                                           FontWeight="Bold"
+                                           Foreground="#93C5FD"
+                                           FontSize="11"
+                                           Text="RSI PROFILE" />
+                                <Border Width="92"
+                                        Height="92"
+                                        Margin="0,12,0,0"
+                                        CornerRadius="10"
+                                        BorderBrush="#3B4F67"
+                                        BorderThickness="1"
+                                        ToolTip="Public RSI citizen avatar for the handle below.">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                            <GradientStop Color="#CC10233B" Offset="0" />
+                                            <GradientStop Color="#CC09131F" Offset="1" />
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                    <Grid>
+                                        <Image Source="{Binding SessionProfileImage}"
+                                               Stretch="UniformToFill" />
+                                        <TextBlock Margin="8"
+                                                   Foreground="#94A3B8"
+                                                   FontSize="11"
+                                                   TextAlignment="Center"
+                                                   TextWrapping="Wrap"
+                                                   VerticalAlignment="Center"
+                                                   Text="{Binding SessionProfileImageStatus}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding SessionProfileImage}" Value="{x:Null}">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Grid>
+                                </Border>
+                                <TextBox Width="170"
+                                         Height="30"
+                                         Margin="0,10,0,0"
+                                         VerticalContentAlignment="Center"
+                                         ToolTip="Enter the public RSI handle, for example Tater_McQuantum."
+                                         Text="{Binding SessionRsiHandle, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Margin="0,6,0,0"
+                                           Foreground="#94A3B8"
+                                           FontSize="10"
+                                           Text="Enter the player's public RSI handle to load their citizen avatar."
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
 
                         <StackPanel Grid.Column="2" VerticalAlignment="Center">
                             <WrapPanel Margin="0,0,0,10">
@@ -129,21 +284,78 @@
 
                             <WrapPanel VerticalAlignment="Center">
                                 <ComboBox Width="148" Height="30" Margin="0,0,10,0"
+                                          ToolTip="Choose the current workflow: live scanning, live mining, or offline queue processing."
                                           ItemsSource="{Binding WorkflowModeOptions}"
-                                          DisplayMemberPath="DisplayName"
                                           SelectedValuePath="Value"
-                                          SelectedValue="{Binding SelectedWorkflowMode}" />
+                                          SelectedValue="{Binding SelectedWorkflowMode}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding DisplayName}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <CheckBox Margin="0,6,10,0"
+                                          VerticalAlignment="Center"
+                                          Foreground="White"
+                                          Content="Capture only"
+                                          ToolTip="Save the raw screenshot without running OCR. Raw captures go to LocalAppData/BobTools/raw-captures-scan or raw-captures-mine."
+                                          IsChecked="{Binding CaptureOnlyMode}" />
                                 <CheckBox Margin="0,6,0,0"
                                           VerticalAlignment="Center"
                                           Foreground="White"
                                           Content="Save debug"
+                                          ToolTip="Save intermediate debug artifacts and processed images under LocalAppData/BobTools/DebugCaptures."
                                           IsChecked="{Binding SaveDebugImages}" />
                             </WrapPanel>
-                        </StackPanel>
 
-                        <TextBlock Grid.Column="4" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="220"
-                                   Foreground="#94A3B8"
-                                   Text="Debug captures save under LocalAppData\BobTools\DebugCaptures." />
+                            <StackPanel Margin="0,10,0,0">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsScanningMode}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsMiningMode}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsOfflineMode}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </StackPanel.Style>
+
+                                <TextBlock Foreground="White" FontWeight="SemiBold" Text="Session Context" />
+                                <WrapPanel Margin="0,6,0,0" ItemHeight="30">
+                                    <ComboBox Width="170"
+                                              Height="30"
+                                              Margin="0,0,10,0"
+                                                             ItemsSource="{Binding SessionShipOptions}"
+                                                             SelectedItem="{Binding SelectedSessionShip, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <ComboBox Width="130"
+                                              Height="30"
+                                              Margin="0,0,10,0"
+                                                             ItemsSource="{Binding SessionSystemOptions}"
+                                                             SelectedItem="{Binding SelectedSessionSystem, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                                <ComboBox Width="540"
+                                              Height="30"
+                                                          Style="{StaticResource SearchableComboBoxStyle}"
+                                                                                                                         ToolTip="Type to filter by system, planet, moon, orbit, station, or nickname."
+                                                             IsEditable="True"
+                                                             IsTextSearchEnabled="False"
+                                                             StaysOpenOnEdit="True"
+                                                             ItemsSource="{Binding SessionLocationOptions}"
+                                                             SelectedItem="{Binding SelectedSessionLocation, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                             Text="{Binding SessionLocationSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              DisplayMemberPath="DisplayPath" />
+                                </WrapPanel>
+                                <TextBlock Margin="0,6,0,0"
+                                           Foreground="#93C5FD"
+                                                         Text="{Binding SessionContextSummary}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </StackPanel>
                     </Grid>
                 </Border>
 
@@ -541,9 +753,14 @@
                             <TextBlock VerticalAlignment="Center" Margin="0,0,8,0" Foreground="White" Text="Offline box:" />
                             <ComboBox Width="140" Height="28" Margin="0,0,8,8"
                                       ItemsSource="{Binding CaptureProfileOptions}"
-                                      DisplayMemberPath="DisplayName"
                                       SelectedValuePath="Value"
-                                      SelectedValue="{Binding OfflineSelectedCaptureProfile}" />
+                                      SelectedValue="{Binding OfflineSelectedCaptureProfile}">
+                                <ComboBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DisplayName}" />
+                                    </DataTemplate>
+                                </ComboBox.ItemTemplate>
+                            </ComboBox>
                             <Button Width="120" Margin="0,0,8,8" Content="Run OCR Test" Command="{Binding RunOfflineTestCommand}" />
                                 <Button Width="120"
                                     Margin="0,0,8,8"
@@ -560,9 +777,6 @@
                                 <StackPanel>
                                     <TextBlock Foreground="White" FontWeight="Bold" Text="Drop Image Here" />
                                     <TextBlock Margin="0,4,0,8" Foreground="#94A3B8" Text="Supports PNG, JPG, JPEG, and BMP. Multiple files are allowed." />
-                                    <TextBlock Margin="0,0,0,8" Foreground="#D1D5DB" Text="{Binding OfflineImagePath}" TextWrapping="Wrap" />
-                                    <TextBlock Margin="0,0,0,8" Foreground="#94A3B8" Text="{Binding OfflineImageInfo}" />
-                                    <TextBlock Margin="0,0,0,8" Foreground="#94A3B8" Text="{Binding OfflineSelectionModeSummary}" TextWrapping="Wrap" />
                                     <GroupBox Header="Queued Images" Foreground="White" BorderBrush="#475569" Margin="0,0,0,8">
                                         <ListBox ItemsSource="{Binding OfflineInputImages}"
                                                  SelectedItem="{Binding SelectedOfflineInputImage}"
@@ -574,6 +788,13 @@
                                                  MaxHeight="180" />
                                     </GroupBox>
                                     <Canvas Width="{Binding OfflinePreviewWidth}" Height="{Binding OfflinePreviewHeight}" HorizontalAlignment="Left" Background="#0F172A">
+                                        <Canvas.ToolTip>
+                                            <StackPanel MaxWidth="320">
+                                                <TextBlock Foreground="White" Text="{Binding OfflineImagePath}" TextWrapping="Wrap" />
+                                                <TextBlock Margin="0,6,0,0" Foreground="#D1D5DB" Text="{Binding OfflineImageInfo}" TextWrapping="Wrap" />
+                                                <TextBlock Margin="0,4,0,0" Foreground="#94A3B8" Text="{Binding OfflineSelectionModeSummary}" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Canvas.ToolTip>
                                         <Border Background="#0F172A" BorderBrush="#334155" BorderThickness="1" />
                                         <Image Source="{Binding OfflinePreviewImage}" Width="{Binding OfflinePreviewWidth}" Height="{Binding OfflinePreviewHeight}" Stretch="Fill" />
                                         <Border Width="{Binding OfflineSelectionWidth}"
@@ -611,13 +832,118 @@
                                            Text="{Binding OfflineSignatureResourceSummary}" />
                                 <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" TextWrapping="Wrap"
                                            Text="{Binding OfflineSelectionModeSummary}" />
-                                <ComboBox Margin="0,8,0,0"
-                                          ItemsSource="{Binding OfflineScanResults}"
-                                          SelectedItem="{Binding SelectedOfflineScanResult}"
-                                          DisplayMemberPath="DisplayName"
-                                          Background="#0F172A"
-                                          Foreground="#E5E7EB"
-                                          BorderBrush="#334155" />
+                                <Border Margin="0,8,0,0"
+                                        Padding="8"
+                                        CornerRadius="10"
+                                        BorderThickness="1"
+                                        BorderBrush="#3B4F67"
+                                        Background="#330B1220">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Grid Width="14" Height="14" Margin="0,0,6,0">
+                                                <Ellipse Stroke="#7DD3FC" StrokeThickness="1.2" />
+                                                <Ellipse Width="8" Height="8" Stroke="#7DD3FC" StrokeThickness="1.2" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                <Ellipse Width="2.6" Height="2.6" Fill="#BAE6FD" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            </Grid>
+                                            <TextBlock Foreground="#93C5FD"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       VerticalAlignment="Center"
+                                                       Text="SCAN REVIEWS" />
+                                        </StackPanel>
+                                        <ListBox Margin="0,8,0,0"
+                                                 MaxHeight="190"
+                                                 ItemsSource="{Binding OfflineScanResults}"
+                                                 SelectedItem="{Binding SelectedOfflineScanResult}"
+                                                 Background="Transparent"
+                                                 BorderThickness="0"
+                                                 Foreground="#E5E7EB"
+                                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                            <ListBox.ItemContainerStyle>
+                                                <Style TargetType="ListBoxItem">
+                                                    <Setter Property="Padding" Value="0" />
+                                                    <Setter Property="Margin" Value="0,0,0,8" />
+                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                    <Setter Property="Background" Value="Transparent" />
+                                                    <Setter Property="BorderThickness" Value="0" />
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="ListBoxItem">
+                                                                <ContentPresenter />
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Style>
+                                            </ListBox.ItemContainerStyle>
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Padding="10"
+                                                            CornerRadius="10"
+                                                            BorderThickness="1"
+                                                            Background="#66121C2C"
+                                                            BorderBrush="#334155">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="BorderBrush" Value="#334155" />
+                                                                <Setter Property="Background" Value="#66121C2C" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}" Value="True">
+                                                                        <Setter Property="BorderBrush" Value="#38BDF8" />
+                                                                        <Setter Property="Background" Value="#7A10233B" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsTargetMatch}" Value="True">
+                                                                        <Setter Property="BorderBrush" Value="#F59E0B" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <StackPanel>
+                                                                <TextBlock Foreground="White"
+                                                                           FontWeight="SemiBold"
+                                                                           Text="{Binding DisplayName}"
+                                                                           TextWrapping="Wrap" />
+                                                                <TextBlock Margin="0,3,0,0"
+                                                                           Foreground="#A7F3D0"
+                                                                           Text="{Binding SignatureResourceSummary}"
+                                                                           TextWrapping="Wrap" />
+                                                                <TextBlock Margin="0,3,0,0"
+                                                                           Foreground="#94A3B8"
+                                                                           FontSize="11"
+                                                                           Text="{Binding ProcessingState}"
+                                                                           TextWrapping="Wrap" />
+                                                            </StackPanel>
+                                                            <Border Grid.Column="1"
+                                                                    Margin="10,0,0,0"
+                                                                    Padding="8,4"
+                                                                    CornerRadius="999"
+                                                                    Background="#1E293B"
+                                                                    BorderBrush="#334155"
+                                                                    BorderThickness="1"
+                                                                    VerticalAlignment="Top">
+                                                                <StackPanel Orientation="Horizontal">
+                                                                    <Grid Width="10" Height="10" Margin="0,0,4,0" VerticalAlignment="Center">
+                                                                        <Ellipse Stroke="#7DD3FC" StrokeThickness="1" />
+                                                                        <Ellipse Width="5" Height="5" Stroke="#7DD3FC" StrokeThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                        <Ellipse Width="2" Height="2" Fill="#BAE6FD" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                    </Grid>
+                                                                    <TextBlock Foreground="#CBD5E1"
+                                                                               FontSize="10"
+                                                                               VerticalAlignment="Center"
+                                                                               Text="scan" />
+                                                                </StackPanel>
+                                                            </Border>
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
 
                             <Grid Grid.Row="2">
@@ -696,161 +1022,305 @@
                                     </Style.Triggers>
                                 </Style>
                             </Grid.Style>
-
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
-                                <RowDefinition Height="10" />
+                                <RowDefinition Height="8" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
 
-                            <StackPanel Grid.Row="0">
-                                <TextBlock Foreground="#93C5FD" FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding OfflineMiningRockSummary}" />
-                                <ComboBox Margin="0,8,0,0"
-                                          ItemsSource="{Binding OfflineMiningResults}"
-                                          SelectedItem="{Binding SelectedOfflineMiningResult}"
-                                          DisplayMemberPath="DisplayName"
-                                          Background="#0F172A"
-                                          Foreground="#E5E7EB"
-                                          BorderBrush="#334155" />
-                            </StackPanel>
+                            <TextBlock Grid.Row="0" Foreground="#93C5FD" FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding OfflineMiningRockSummary}" />
+                            <Border Grid.Row="2"
+                                    Padding="8"
+                                    CornerRadius="10"
+                                    BorderThickness="1"
+                                    BorderBrush="#3B4F67"
+                                    Background="#330B1220">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="8" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
 
-                            <Grid Grid.Row="2">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="1.15*" />
-                                    <ColumnDefinition Width="10" />
-                                    <ColumnDefinition Width="1.6*" />
-                                </Grid.ColumnDefinitions>
-
-                                <GroupBox Header="OCR Image" Foreground="White" BorderBrush="#475569">
-                                    <Grid Margin="6">
-                                        <Border Background="#0F172A" BorderBrush="#334155" BorderThickness="1" CornerRadius="6">
-                                            <Image Source="{Binding SelectedOfflineMiningResult.ProcessedPreviewImage}" Stretch="Uniform" />
-                                        </Border>
-                                    </Grid>
-                                </GroupBox>
-
-                                <GroupBox Grid.Column="2" Header="Scan Result" Foreground="White" BorderBrush="#475569">
-                                    <ScrollViewer Margin="6" VerticalScrollBarVisibility="Auto">
-                                        <StackPanel>
-                                            <Grid Margin="0,0,0,8">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto" />
-                                                    <ColumnDefinition Width="10" />
-                                                    <ColumnDefinition Width="*" />
-                                                </Grid.ColumnDefinitions>
-                                                <Grid.RowDefinitions>
-                                                    <RowDefinition Height="Auto" />
-                                                    <RowDefinition Height="Auto" />
-                                                    <RowDefinition Height="Auto" />
-                                                    <RowDefinition Height="Auto" />
-                                                    <RowDefinition Height="Auto" />
-                                                    <RowDefinition Height="Auto" />
-                                                </Grid.RowDefinitions>
-                                                <TextBlock Text="Location" Foreground="#94A3B8" VerticalAlignment="Center" />
-                                                <TextBox Grid.Column="2" Text="{Binding SelectedOfflineMiningResult.EditableLocation, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
-                                                <TextBlock Grid.Row="1" Text="Material" Foreground="#94A3B8" VerticalAlignment="Center" />
-                                                <TextBox Grid.Row="1" Grid.Column="2" Text="{Binding SelectedOfflineMiningResult.EditableMaterial, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
-                                                <TextBlock Grid.Row="2" Text="Mass" Foreground="#94A3B8" VerticalAlignment="Center" />
-                                                <TextBox Grid.Row="2" Grid.Column="2" Text="{Binding SelectedOfflineMiningResult.EditableMass, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
-                                                <TextBlock Grid.Row="3" Text="Resistance" Foreground="#94A3B8" VerticalAlignment="Center" />
-                                                <TextBox Grid.Row="3" Grid.Column="2" Text="{Binding SelectedOfflineMiningResult.EditableResistance, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
-                                                <TextBlock Grid.Row="4" Text="Instability" Foreground="#94A3B8" VerticalAlignment="Center" />
-                                                <TextBox Grid.Row="4" Grid.Column="2" Text="{Binding SelectedOfflineMiningResult.EditableInstability, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
-                                                <TextBlock Grid.Row="5" Text="Composition" Foreground="#94A3B8" VerticalAlignment="Center" />
-                                                <TextBox Grid.Row="5" Grid.Column="2" Text="{Binding SelectedOfflineMiningResult.EditableComposition, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                    <StackPanel Orientation="Horizontal" Grid.Row="0">
+                                            <Grid Width="14" Height="14" Margin="0,0,6,0">
+                                                <Polygon Points="7,0.8 13.2,7 7,13.2 0.8,7"
+                                                         Fill="#0F172A"
+                                                         Stroke="#FBBF24"
+                                                         StrokeThickness="1.2" />
+                                                <Ellipse Width="3" Height="3" Fill="#FDE68A" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                             </Grid>
+                                            <TextBlock Foreground="#93C5FD"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       VerticalAlignment="Center"
+                                                       Text="MINING REVIEWS" />
+                                    </StackPanel>
+                                    <ListBox Grid.Row="2"
+                                             ItemsSource="{Binding OfflineMiningResults}"
+                                             SelectedItem="{Binding SelectedOfflineMiningResult}"
+                                             Background="Transparent"
+                                             BorderThickness="0"
+                                             Foreground="#E5E7EB"
+                                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                             ScrollViewer.CanContentScroll="True">
+                                            <ListBox.ItemContainerStyle>
+                                                <Style TargetType="ListBoxItem">
+                                                    <Setter Property="Padding" Value="0" />
+                                                    <Setter Property="Margin" Value="0,0,0,10" />
+                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                    <Setter Property="Background" Value="Transparent" />
+                                                    <Setter Property="BorderThickness" Value="0" />
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="ListBoxItem">
+                                                                <ContentPresenter />
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Style>
+                                            </ListBox.ItemContainerStyle>
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Padding="12"
+                                                            CornerRadius="12"
+                                                            BorderThickness="1"
+                                                            Background="#66121C2C"
+                                                            BorderBrush="#334155">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="BorderBrush" Value="#334155" />
+                                                                <Setter Property="Background" Value="#66121C2C" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ListBoxItem}, Path=IsSelected}" Value="True">
+                                                                        <Setter Property="BorderBrush" Value="#38BDF8" />
+                                                                        <Setter Property="Background" Value="#7A10233B" />
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsDirty}" Value="True">
+                                                                        <Setter Property="BorderBrush" Value="#F59E0B" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <StackPanel>
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <StackPanel>
+                                                                    <TextBlock Foreground="White"
+                                                                               FontWeight="SemiBold"
+                                                                               Text="{Binding DisplayName}"
+                                                                               TextWrapping="Wrap" />
+                                                                    <TextBlock Margin="0,3,0,0"
+                                                                               Foreground="#A7F3D0"
+                                                                               Text="{Binding Summary}"
+                                                                               TextWrapping="Wrap" />
+                                                                    <TextBlock Margin="0,3,0,0"
+                                                                               Foreground="#94A3B8"
+                                                                               FontSize="11"
+                                                                               Text="{Binding ProcessingState}"
+                                                                               TextWrapping="Wrap" />
+                                                                </StackPanel>
+                                                                <Border Grid.Column="1"
+                                                                        Margin="10,0,0,0"
+                                                                        Padding="8,4"
+                                                                        CornerRadius="999"
+                                                                        Background="#1E293B"
+                                                                        BorderBrush="#334155"
+                                                                        BorderThickness="1"
+                                                                        VerticalAlignment="Top">
+                                                                    <StackPanel Orientation="Horizontal">
+                                                                        <Grid Width="10" Height="10" Margin="0,0,4,0" VerticalAlignment="Center">
+                                                                            <Polygon Points="5,0.7 9.3,5 5,9.3 0.7,5"
+                                                                                     Fill="#0F172A"
+                                                                                     Stroke="#FBBF24"
+                                                                                     StrokeThickness="1" />
+                                                                            <Ellipse Width="2" Height="2" Fill="#FDE68A" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                                        </Grid>
+                                                                        <TextBlock FontSize="10"
+                                                                                   VerticalAlignment="Center">
+                                                                            <TextBlock.Style>
+                                                                                <Style TargetType="TextBlock">
+                                                                                    <Setter Property="Text" Value="mine" />
+                                                                                    <Setter Property="Foreground" Value="#CBD5E1" />
+                                                                                    <Style.Triggers>
+                                                                                        <DataTrigger Binding="{Binding IsDirty}" Value="True">
+                                                                                            <Setter Property="Text" Value="pending" />
+                                                                                            <Setter Property="Foreground" Value="#FCD34D" />
+                                                                                        </DataTrigger>
+                                                                                    </Style.Triggers>
+                                                                                </Style>
+                                                                            </TextBlock.Style>
+                                                                        </TextBlock>
+                                                                    </StackPanel>
+                                                                </Border>
+                                                            </Grid>
 
-                                            <WrapPanel Margin="0,0,0,8">
-                                                <Button Content="Add Row" Width="100" Margin="0,0,8,0" Command="{Binding AddOfflineMiningRowCommand}" />
-                                                <Button Content="Save Result"
-                                                    Width="110"
-                                                    Command="{Binding SaveOfflineMiningEditsCommand}"
-                                                    Style="{StaticResource DirtyAwareSaveButtonStyle}"
-                                                    Tag="{Binding SelectedOfflineMiningResult.IsDirty}" />
-                                            </WrapPanel>
+                                                            <Grid Margin="0,12,0,0">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="260" />
+                                                                    <ColumnDefinition Width="12" />
+                                                                    <ColumnDefinition Width="*" />
+                                                                </Grid.ColumnDefinitions>
 
-                                            <DataGrid ItemsSource="{Binding SelectedOfflineMiningResult.EditableElements}"
-                                                      AutoGenerateColumns="False"
-                                                      CanUserAddRows="False"
-                                                      HeadersVisibility="Column"
-                                                      Background="#0F172A"
-                                                      Foreground="#E5E7EB"
-                                                      BorderBrush="#334155"
-                                                      RowBackground="#0F172A"
-                                                      AlternatingRowBackground="#111827"
-                                                      GridLinesVisibility="Horizontal"
-                                                      HorizontalGridLinesBrush="#334155"
-                                                      VerticalGridLinesBrush="#334155"
-                                                      MinHeight="220">
-                                                <DataGrid.Resources>
-                                                    <Style TargetType="DataGridColumnHeader">
-                                                        <Setter Property="Background" Value="#1E293B" />
-                                                        <Setter Property="Foreground" Value="#E5E7EB" />
-                                                        <Setter Property="BorderBrush" Value="#475569" />
-                                                        <Setter Property="BorderThickness" Value="0,0,0,1" />
-                                                        <Setter Property="FontWeight" Value="SemiBold" />
-                                                        <Setter Property="Padding" Value="8,6" />
-                                                    </Style>
-                                                    <Style TargetType="DataGridCell">
-                                                        <Setter Property="Background" Value="#0F172A" />
-                                                        <Setter Property="Foreground" Value="#E5E7EB" />
-                                                        <Setter Property="BorderBrush" Value="#334155" />
-                                                        <Setter Property="BorderThickness" Value="0,0,0,1" />
-                                                        <Setter Property="Padding" Value="6,4" />
-                                                        <Setter Property="VerticalContentAlignment" Value="Center" />
-                                                        <Style.Triggers>
-                                                            <Trigger Property="IsSelected" Value="True">
-                                                                <Setter Property="Background" Value="#1D4ED8" />
-                                                                <Setter Property="Foreground" Value="White" />
-                                                            </Trigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                    <Style x:Key="OfflineGridTextBlockStyle" TargetType="TextBlock">
-                                                        <Setter Property="Foreground" Value="#E5E7EB" />
-                                                        <Setter Property="VerticalAlignment" Value="Center" />
-                                                    </Style>
-                                                    <Style x:Key="OfflineGridEditingTextBoxStyle" TargetType="TextBox">
-                                                        <Setter Property="Background" Value="#0F172A" />
-                                                        <Setter Property="Foreground" Value="#E5E7EB" />
-                                                        <Setter Property="BorderBrush" Value="#475569" />
-                                                        <Setter Property="BorderThickness" Value="1" />
-                                                        <Setter Property="CaretBrush" Value="#E5E7EB" />
-                                                        <Setter Property="Padding" Value="4,2" />
-                                                        <Setter Property="SelectionBrush" Value="#2563EB" />
-                                                    </Style>
-                                                </DataGrid.Resources>
-                                                <DataGrid.Columns>
-                                                    <DataGridTextColumn Header="Element"
-                                                                        Binding="{Binding Element, UpdateSourceTrigger=PropertyChanged}"
-                                                                        Width="*"
-                                                                        ElementStyle="{StaticResource OfflineGridTextBlockStyle}"
-                                                                        EditingElementStyle="{StaticResource OfflineGridEditingTextBoxStyle}" />
-                                                    <DataGridTextColumn Header="Percentage"
-                                                                        Binding="{Binding PercentageText, UpdateSourceTrigger=PropertyChanged}"
-                                                                        Width="110"
-                                                                        ElementStyle="{StaticResource OfflineGridTextBlockStyle}"
-                                                                        EditingElementStyle="{StaticResource OfflineGridEditingTextBoxStyle}" />
-                                                    <DataGridTextColumn Header="Quality"
-                                                                        Binding="{Binding QualityText, UpdateSourceTrigger=PropertyChanged}"
-                                                                        Width="90"
-                                                                        ElementStyle="{StaticResource OfflineGridTextBlockStyle}"
-                                                                        EditingElementStyle="{StaticResource OfflineGridEditingTextBoxStyle}" />
-                                                    <DataGridTemplateColumn Header="Delete" Width="70">
-                                                        <DataGridTemplateColumn.CellTemplate>
-                                                            <DataTemplate>
-                                                                <Button Content="Delete"
-                                                                        Padding="6,2"
-                                                                        Command="{Binding DataContext.DeleteOfflineMiningRowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                                                                        CommandParameter="{Binding}" />
-                                                            </DataTemplate>
-                                                        </DataGridTemplateColumn.CellTemplate>
-                                                    </DataGridTemplateColumn>
-                                                </DataGrid.Columns>
-                                            </DataGrid>
-                                        </StackPanel>
-                                    </ScrollViewer>
-                                </GroupBox>
-                            </Grid>
+                                                                <StackPanel>
+                                                                    <Border Background="#0F172A"
+                                                                            BorderBrush="#334155"
+                                                                            BorderThickness="1"
+                                                                            CornerRadius="8"
+                                                                            Height="170">
+                                                                        <Image Source="{Binding ProcessedPreviewImage}" Stretch="Uniform" />
+                                                                    </Border>
+                                                                    <Grid Margin="0,10,0,0">
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="Auto" />
+                                                                            <ColumnDefinition Width="10" />
+                                                                            <ColumnDefinition Width="*" />
+                                                                        </Grid.ColumnDefinitions>
+                                                                        <Grid.RowDefinitions>
+                                                                            <RowDefinition Height="Auto" />
+                                                                            <RowDefinition Height="Auto" />
+                                                                        </Grid.RowDefinitions>
+                                                                        <TextBlock Text="OCR Mode" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                                        <TextBlock Grid.Column="2" Text="{Binding UsedOcrModeSummary}" Foreground="#E5E7EB" TextWrapping="Wrap" />
+                                                                        <TextBlock Grid.Row="1" Text="Source" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                                        <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding OcrSourceSummary}" Foreground="#E5E7EB" TextWrapping="Wrap" />
+                                                                    </Grid>
+                                                                </StackPanel>
+
+                                                                <StackPanel Grid.Column="2">
+                                                                    <Border Padding="10"
+                                                                            CornerRadius="8"
+                                                                            Background="#0F172A"
+                                                                            BorderBrush="#334155"
+                                                                            BorderThickness="1">
+                                                                        <Grid>
+                                                                            <Grid.ColumnDefinitions>
+                                                                                <ColumnDefinition Width="Auto" />
+                                                                                <ColumnDefinition Width="10" />
+                                                                                <ColumnDefinition Width="*" />
+                                                                            </Grid.ColumnDefinitions>
+                                                                            <Grid.RowDefinitions>
+                                                                                <RowDefinition Height="Auto" />
+                                                                                <RowDefinition Height="Auto" />
+                                                                                <RowDefinition Height="Auto" />
+                                                                                <RowDefinition Height="Auto" />
+                                                                                <RowDefinition Height="Auto" />
+                                                                                <RowDefinition Height="Auto" />
+                                                                            </Grid.RowDefinitions>
+                                                                            <TextBlock Text="Location" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                                            <TextBox Grid.Column="2" Text="{Binding EditableLocation, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                                            <TextBlock Grid.Row="1" Text="Material" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                                            <TextBox Grid.Row="1" Grid.Column="2" Text="{Binding EditableMaterial, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                                            <TextBlock Grid.Row="2" Text="Mass" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                                            <TextBox Grid.Row="2" Grid.Column="2" Text="{Binding EditableMass, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                                            <TextBlock Grid.Row="3" Text="Resistance" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                                            <TextBox Grid.Row="3" Grid.Column="2" Text="{Binding EditableResistance, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                                            <TextBlock Grid.Row="4" Text="Instability" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                                            <TextBox Grid.Row="4" Grid.Column="2" Text="{Binding EditableInstability, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                                            <TextBlock Grid.Row="5" Text="Composition" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                                            <TextBox Grid.Row="5" Grid.Column="2" Text="{Binding EditableComposition, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                                        </Grid>
+                                                                    </Border>
+
+                                                                    <WrapPanel Margin="0,10,0,8">
+                                                                        <Button Content="Add Row" Width="100" Margin="0,0,8,0" Command="{Binding AddRowCommand}" />
+                                                                        <Button Content="Save Result"
+                                                                                Width="110"
+                                                                                Command="{Binding SaveCommand}"
+                                                                                Style="{StaticResource DirtyAwareSaveButtonStyle}"
+                                                                                Tag="{Binding IsDirty}" />
+                                                                    </WrapPanel>
+
+                                                                    <DataGrid ItemsSource="{Binding EditableElements}"
+                                                                              AutoGenerateColumns="False"
+                                                                              CanUserAddRows="False"
+                                                                              HeadersVisibility="Column"
+                                                                              Background="#0F172A"
+                                                                              Foreground="#E5E7EB"
+                                                                              BorderBrush="#334155"
+                                                                              RowBackground="#0F172A"
+                                                                              AlternatingRowBackground="#111827"
+                                                                              GridLinesVisibility="Horizontal"
+                                                                              HorizontalGridLinesBrush="#334155"
+                                                                              VerticalGridLinesBrush="#334155"
+                                                                              MinHeight="180">
+                                                                        <DataGrid.Resources>
+                                                                            <Style TargetType="DataGridColumnHeader">
+                                                                                <Setter Property="Background" Value="#1E293B" />
+                                                                                <Setter Property="Foreground" Value="#E5E7EB" />
+                                                                                <Setter Property="BorderBrush" Value="#475569" />
+                                                                                <Setter Property="BorderThickness" Value="0,0,0,1" />
+                                                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                                                                <Setter Property="Padding" Value="8,6" />
+                                                                            </Style>
+                                                                            <Style TargetType="DataGridCell">
+                                                                                <Setter Property="Background" Value="#0F172A" />
+                                                                                <Setter Property="Foreground" Value="#E5E7EB" />
+                                                                                <Setter Property="BorderBrush" Value="#334155" />
+                                                                                <Setter Property="BorderThickness" Value="0,0,0,1" />
+                                                                                <Setter Property="Padding" Value="6,4" />
+                                                                                <Setter Property="VerticalContentAlignment" Value="Center" />
+                                                                                <Style.Triggers>
+                                                                                    <Trigger Property="IsSelected" Value="True">
+                                                                                        <Setter Property="Background" Value="#1D4ED8" />
+                                                                                        <Setter Property="Foreground" Value="White" />
+                                                                                    </Trigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                            <Style x:Key="OfflineGridTextBlockStyle" TargetType="TextBlock">
+                                                                                <Setter Property="Foreground" Value="#E5E7EB" />
+                                                                                <Setter Property="VerticalAlignment" Value="Center" />
+                                                                            </Style>
+                                                                            <Style x:Key="OfflineGridEditingTextBoxStyle" TargetType="TextBox">
+                                                                                <Setter Property="Background" Value="#0F172A" />
+                                                                                <Setter Property="Foreground" Value="#E5E7EB" />
+                                                                                <Setter Property="BorderBrush" Value="#475569" />
+                                                                                <Setter Property="BorderThickness" Value="1" />
+                                                                                <Setter Property="CaretBrush" Value="#E5E7EB" />
+                                                                                <Setter Property="Padding" Value="4,2" />
+                                                                                <Setter Property="SelectionBrush" Value="#2563EB" />
+                                                                            </Style>
+                                                                        </DataGrid.Resources>
+                                                                        <DataGrid.Columns>
+                                                                            <DataGridTextColumn Header="Element"
+                                                                                                Binding="{Binding Element, UpdateSourceTrigger=PropertyChanged}"
+                                                                                                Width="*"
+                                                                                                ElementStyle="{StaticResource OfflineGridTextBlockStyle}"
+                                                                                                EditingElementStyle="{StaticResource OfflineGridEditingTextBoxStyle}" />
+                                                                            <DataGridTextColumn Header="Percentage"
+                                                                                                Binding="{Binding PercentageText, UpdateSourceTrigger=PropertyChanged}"
+                                                                                                Width="110"
+                                                                                                ElementStyle="{StaticResource OfflineGridTextBlockStyle}"
+                                                                                                EditingElementStyle="{StaticResource OfflineGridEditingTextBoxStyle}" />
+                                                                            <DataGridTextColumn Header="Quality"
+                                                                                                Binding="{Binding QualityText, UpdateSourceTrigger=PropertyChanged}"
+                                                                                                Width="90"
+                                                                                                ElementStyle="{StaticResource OfflineGridTextBlockStyle}"
+                                                                                                EditingElementStyle="{StaticResource OfflineGridEditingTextBoxStyle}" />
+                                                                            <DataGridTemplateColumn Header="Delete" Width="70">
+                                                                                <DataGridTemplateColumn.CellTemplate>
+                                                                                    <DataTemplate>
+                                                                                        <Button Content="Delete"
+                                                                                                Padding="6,2"
+                                                                                                Command="{Binding DataContext.DeleteRowCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                                                                CommandParameter="{Binding}" />
+                                                                                    </DataTemplate>
+                                                                                </DataGridTemplateColumn.CellTemplate>
+                                                                            </DataGridTemplateColumn>
+                                                                        </DataGrid.Columns>
+                                                                    </DataGrid>
+                                                                </StackPanel>
+                                                            </Grid>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </Grid>
+                            </Border>
                         </Grid>
                     </Grid>
                 </TabItem>
