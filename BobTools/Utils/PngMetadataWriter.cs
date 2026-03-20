@@ -66,9 +66,14 @@ internal static class PngMetadataWriter
         string imageRole,
         IReadOnlyDictionary<string, string?>? extraMetadata)
     {
+        var timestampUtc = DateTime.UtcNow.ToString("O");
+        var comment = $"SessionId={sessionId}; RsiHandle={sessionMetadata.RsiHandle}; Ship={sessionMetadata.Ship}; StarSystem={sessionMetadata.StarSystem}; LocationPath={sessionMetadata.LocationPath}";
+
         var metadata = new BitmapMetadata("png");
+
+        // PNG tEXt chunks — readable by BobTools and tools like exiftool
         SetText(metadata, "Software", "BobTools");
-        SetText(metadata, "Comment", $"SessionId={sessionId}; RsiHandle={sessionMetadata.RsiHandle}; Ship={sessionMetadata.Ship}; StarSystem={sessionMetadata.StarSystem}; LocationPath={sessionMetadata.LocationPath}");
+        SetText(metadata, "Comment", comment);
         SetText(metadata, "BobTools.SessionId", sessionId);
         SetText(metadata, "BobTools.RsiHandle", sessionMetadata.RsiHandle);
         SetText(metadata, "BobTools.Ship", sessionMetadata.Ship);
@@ -78,7 +83,7 @@ internal static class PngMetadataWriter
         SetText(metadata, "BobTools.LocationPath", sessionMetadata.LocationPath);
         SetText(metadata, "BobTools.CaptureProfile", captureProfile);
         SetText(metadata, "BobTools.ImageRole", imageRole);
-        SetText(metadata, "BobTools.TimestampUtc", DateTime.UtcNow.ToString("O"));
+        SetText(metadata, "BobTools.TimestampUtc", timestampUtc);
 
         if (extraMetadata is not null)
         {
@@ -88,17 +93,60 @@ internal static class PngMetadataWriter
             }
         }
 
+        // XMP — surfaces in Windows Explorer Details pane and standard metadata viewers
+        SetXmp(metadata, "xmp:CreatorTool", "BobTools");
+        SetXmp(metadata, "xmp:CreateDate", timestampUtc);
+        SetXmpAlt(metadata, "dc:description", comment);
+        SetXmp(metadata, "BobTools:SessionId", sessionId);
+        SetXmp(metadata, "BobTools:RsiHandle", sessionMetadata.RsiHandle);
+        SetXmp(metadata, "BobTools:Ship", sessionMetadata.Ship);
+        SetXmp(metadata, "BobTools:StarSystem", sessionMetadata.StarSystem);
+        SetXmp(metadata, "BobTools:LocationKey", sessionMetadata.LocationKey);
+        SetXmp(metadata, "BobTools:LocationName", sessionMetadata.LocationName);
+        SetXmp(metadata, "BobTools:LocationPath", sessionMetadata.LocationPath);
+        SetXmp(metadata, "BobTools:CaptureProfile", captureProfile);
+        SetXmp(metadata, "BobTools:ImageRole", imageRole);
+
+        if (extraMetadata is not null)
+        {
+            foreach (var pair in extraMetadata)
+            {
+                if (!string.IsNullOrWhiteSpace(pair.Key) && !string.IsNullOrWhiteSpace(pair.Value))
+                    SetXmp(metadata, $"BobTools:{pair.Key.Replace("BobTools.", "")}", pair.Value);
+            }
+        }
+
         return metadata;
     }
 
     private static void SetText(BitmapMetadata metadata, string key, string? value)
     {
         if (string.IsNullOrWhiteSpace(key) || string.IsNullOrWhiteSpace(value))
-        {
             return;
-        }
 
         metadata.SetQuery($"/tEXt/{{str={key}}}", value);
+    }
+
+    private static void SetXmp(BitmapMetadata metadata, string path, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return;
+
+        try { metadata.SetQuery($"/xmp/{path}", value); }
+        catch { /* ignore unsupported XMP paths */ }
+    }
+
+    /// <summary>
+    /// Sets an XMP alt-lang string (rdf:Alt), which is the correct XMP type for
+    /// dc:description. Windows Explorer reads this as the "Comments" field.
+    /// </summary>
+    private static void SetXmpAlt(BitmapMetadata metadata, string path, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return;
+
+        try { metadata.SetQuery($"/xmp/{path}/{{lang=x-default}}", value); }
+        catch { /* ignore unsupported XMP paths */ }
     }
 
     [DllImport("gdi32.dll")]
