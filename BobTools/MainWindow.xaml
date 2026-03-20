@@ -11,6 +11,7 @@
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
+        Opacity="{Binding OverlayOpacity}"
         ShowInTaskbar="False"
         Topmost="True"
         ResizeMode="CanResizeWithGrip">
@@ -32,6 +33,16 @@
             </Grid.RowDefinitions>
 
             <Grid>
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsCompactMode}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="14" />
@@ -86,7 +97,7 @@
                             <TextBlock Margin="0,6,0,0"
                                        Foreground="#94A3B8"
                                        FontSize="11"
-                                       Text="Track the haul. Count the wins. Chase better numbers every run." />
+                                       Text="Your Industrial Symphony" />
 
                             <Grid Margin="0,10,0,0">
                                 <Grid.ColumnDefinitions>
@@ -225,65 +236,138 @@
 
                         <StackPanel Grid.Column="2" VerticalAlignment="Center">
                             <WrapPanel Margin="0,0,0,10">
-                                <Button Style="{StaticResource ImageToolbarButtonStyle}"
-                                    ToolTip="Set Scan area"
-                                    Command="{Binding SelectSignatureRegionCommand}"
-                                    Visibility="{Binding IsScanningMode, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                    <Image Width="50"
-                                           Height="50"
-                                           Stretch="Uniform"
-                                           Source="pack://siteoforigin:,,,/Assets/images/btn_set_scan.png" />
+                                <Button Style="{StaticResource FullSelectAreaButtonStyle}"
+                                        ToolTip="Set Scan area"
+                                        Command="{Binding SelectSignatureRegionCommand}"
+                                        Visibility="{Binding IsScanningMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Viewbox Width="26" Height="26" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                            <Grid Width="24" Height="24">
+                                                <Rectangle Width="16" Height="16" Stroke="#D8F3FF" StrokeThickness="1.2" StrokeDashArray="1.4,1.1" Opacity="0.85" />
+                                                <Path Stroke="#FFFFFF" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M2,8 L2,2 L8,2 M16,2 L22,2 L22,8 M22,16 L22,22 L16,22 M8,22 L2,22 L2,16" />
+                                            </Grid>
+                                        </Viewbox>
+                                        <TextBlock Grid.Row="1" Margin="0,5,0,0" Foreground="White" FontSize="12" FontWeight="Bold" Text="Set Area" />
+                                    </Grid>
                                 </Button>
-                                <Button Style="{StaticResource ImageToolbarButtonStyle}"
-                                    ToolTip="Capture Scan"
-                                    Command="{Binding CaptureSignatureCommand}"
-                                    Visibility="{Binding IsScanningMode, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                    <Image Width="50"
-                                           Height="50"
-                                           Stretch="Uniform"
-                                           Source="pack://siteoforigin:,,,/Assets/images/btn_capture_scan.png" />
+                                <Button Style="{StaticResource FullCaptureButtonStyle}"
+                                        ToolTip="Capture Scan"
+                                        Command="{Binding CaptureSignatureCommand}"
+                                        Visibility="{Binding IsScanningMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Viewbox Width="26" Height="26" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                            <Grid Width="24" Height="24">
+                                                <Path Fill="#ECFDF5" Data="M7,5 L10,5 L11.5,3.5 L16.5,3.5 L18,5 L20,5 C21.1,5 22,5.9 22,7 L22,18 C22,19.1 21.1,20 20,20 L4,20 C2.9,20 2,19.1 2,18 L2,7 C2,5.9 2.9,5 4,5 Z" Opacity="0.95" />
+                                                <Ellipse Width="7.2" Height="7.2" Stroke="#0B3B2E" StrokeThickness="1.6" Fill="#34D399" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                <Ellipse Width="2.1" Height="2.1" Fill="#0B3B2E" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,7,5.2,0" />
+                                            </Grid>
+                                        </Viewbox>
+                                        <TextBlock Grid.Row="1" Margin="0,5,0,0" Foreground="White" FontSize="12" FontWeight="Bold" Text="Capture" />
+                                    </Grid>
                                 </Button>
-                                <Button Style="{StaticResource ImageToolbarButtonStyle}"
+                                <Button Style="{StaticResource FullSelectAreaButtonStyle}"
                                         ToolTip="Set Mining area"
-                                    Command="{Binding SelectMiningRegionCommand}"
-                                    Visibility="{Binding IsMiningMode, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                    <Image Width="50"
-                                           Height="50"
-                                           Stretch="Uniform"
-                                           Source="pack://siteoforigin:,,,/Assets/images/btn_set_mine.png" />
+                                        Command="{Binding SelectMiningRegionCommand}"
+                                        Visibility="{Binding IsMiningMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Viewbox Width="26" Height="26" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                            <Grid Width="24" Height="24">
+                                                <Rectangle Width="17" Height="12" RadiusX="2" RadiusY="2" Stroke="#ECFEFF" StrokeThickness="1.4" Fill="#103540" />
+                                                <Path Fill="#67E8F9" Data="M6,17 L9.5,12.6 L12.2,15.6 L15.1,10.5 L18,17 Z" />
+                                                <Ellipse Width="3.2" Height="3.2" Fill="#A5F3FC" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="5.5,5.5,0,0" />
+                                            </Grid>
+                                        </Viewbox>
+                                        <TextBlock Grid.Row="1" Margin="0,5,0,0" Foreground="White" FontSize="12" FontWeight="Bold" Text="Set Area" />
+                                    </Grid>
                                 </Button>
-                                <Button Style="{StaticResource ImageToolbarButtonStyle}"
+                                <Button Style="{StaticResource FullCaptureButtonStyle}"
                                         ToolTip="Capture Mining"
-                                    Command="{Binding CaptureMiningCommand}"
-                                    Visibility="{Binding IsMiningMode, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                    <Image Width="50"
-                                           Height="50"
-                                           Stretch="Uniform"
-                                           Source="pack://siteoforigin:,,,/Assets/images/btn_capture_mine.png" />
+                                        Command="{Binding CaptureMiningCommand}"
+                                        Visibility="{Binding IsMiningMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Viewbox Width="26" Height="26" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                            <Grid Width="24" Height="24">
+                                                <Path Fill="#ECFDF5" Data="M4,17 L9.6,7 L15.4,17 Z" />
+                                                <Path Fill="#6EE7B7" Data="M9.2,17 L13.8,8.8 L18.7,17 Z" />
+                                                <Ellipse Width="3" Height="3" Fill="#D1FAE5" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,3.4" />
+                                            </Grid>
+                                        </Viewbox>
+                                        <TextBlock Grid.Row="1" Margin="0,5,0,0" Foreground="White" FontSize="12" FontWeight="Bold" Text="Capture" />
+                                    </Grid>
                                 </Button>
-                                <Button Style="{StaticResource ImageToolbarButtonStyle}"
+                                <Button Style="{StaticResource FullModeActionButtonStyle}"
                                         ToolTip="Queue Folder"
-                                    Command="{Binding LoadLiveMiningFolderCommand}"
-                                    Visibility="{Binding IsOfflineMode, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                    <Image Width="50"
-                                           Height="50"
-                                           Stretch="Uniform"
-                                           Source="pack://siteoforigin:,,,/Assets/images/btn_offline_queue.png" />
+                                        Command="{Binding LoadLiveMiningFolderCommand}"
+                                        Visibility="{Binding IsOfflineMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Viewbox Width="26" Height="26" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                            <Grid Width="24" Height="24">
+                                                <Path Fill="#FDE68A" Data="M3,7 C3,5.9 3.9,5 5,5 L9.2,5 L11.2,7 L19,7 C20.1,7 21,7.9 21,9 L21,17 C21,18.1 20.1,19 19,19 L5,19 C3.9,19 3,18.1 3,17 Z" />
+                                                <Path Fill="#FBBF24" Data="M4,10 L20,10 L18.2,18 L5.8,18 Z" />
+                                            </Grid>
+                                        </Viewbox>
+                                        <TextBlock Grid.Row="1" Margin="0,5,0,0" Foreground="White" FontSize="12" FontWeight="Bold" Text="Queue" />
+                                    </Grid>
                                 </Button>
-                                <Button Style="{StaticResource ImageToolbarButtonStyle}"
-                                        Margin="0"
-                                        ToolTip="Open Debug Folder"
-                                        Command="{Binding OpenDebugFolderCommand}"
-                                        Visibility="{Binding SaveDebugImages, Converter={StaticResource BooleanToVisibilityConverter}}">
-                                    <Image Width="50"
-                                           Height="50"
-                                           Stretch="Uniform"
-                                           Source="pack://siteoforigin:,,,/Assets/images/btn_open_debug.png" />
+                                <Button Style="{StaticResource FullViewToggleButtonStyle}"
+                                        ToolTip="Compact Mode"
+                                        Command="{Binding ToggleCompactModeCommand}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Viewbox Width="26" Height="26" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                            <Grid Width="24" Height="24">
+                                                <Rectangle Width="18" Height="12" RadiusX="1.6" RadiusY="1.6" Stroke="#E0E7FF" StrokeThickness="1.5" />
+                                                <Rectangle Width="9" Height="10" RadiusX="1.2" RadiusY="1.2" Stroke="#C7D2FE" StrokeThickness="1.5" HorizontalAlignment="Right" VerticalAlignment="Bottom" />
+                                            </Grid>
+                                        </Viewbox>
+                                        <TextBlock Grid.Row="1" Margin="0,5,0,0" Foreground="White" FontSize="12" FontWeight="Bold" Text="Compact" />
+                                    </Grid>
+                                </Button>
+                                <Button Style="{StaticResource FullSettingsButtonStyle}"
+                                        ToolTip="Open overlay settings"
+                                        Click="OpenSettingsButton_Click">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Viewbox Width="26" Height="26" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                            <Grid Width="24" Height="24">
+                                                <Ellipse Width="8" Height="8" Fill="#E2E8F0" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                <Ellipse Width="17" Height="17" Stroke="#E2E8F0" StrokeThickness="1.6" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                <Path Stroke="#E2E8F0" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M12,1.8 L12,4.4 M12,19.6 L12,22.2 M1.8,12 L4.4,12 M19.6,12 L22.2,12 M4.7,4.7 L6.5,6.5 M17.5,17.5 L19.3,19.3 M17.5,6.5 L19.3,4.7 M4.7,19.3 L6.5,17.5" />
+                                            </Grid>
+                                        </Viewbox>
+                                        <TextBlock Grid.Row="1" Margin="0,5,0,0" Foreground="White" FontSize="12" FontWeight="Bold" Text="Settings" />
+                                    </Grid>
                                 </Button>
                             </WrapPanel>
 
                             <WrapPanel VerticalAlignment="Center">
-                                <ComboBox Width="148" Height="30" Margin="0,0,10,0"
+                                <ComboBox Width="170" Height="30" Margin="0,0,10,0"
                                           ToolTip="Choose the current workflow: live scanning, live mining, or offline queue processing."
                                           ItemsSource="{Binding WorkflowModeOptions}"
                                           SelectedValuePath="Value"
@@ -294,78 +378,69 @@
                                         </DataTemplate>
                                     </ComboBox.ItemTemplate>
                                 </ComboBox>
-                                <CheckBox Margin="0,6,10,0"
-                                          VerticalAlignment="Center"
-                                          Foreground="White"
-                                          Content="Capture only"
-                                          ToolTip="Save the raw screenshot without running OCR. Raw captures go to LocalAppData/BobTools/raw-captures-scan or raw-captures-mine."
-                                          IsChecked="{Binding CaptureOnlyMode}" />
-                                <CheckBox Margin="0,6,0,0"
-                                          VerticalAlignment="Center"
-                                          Foreground="White"
-                                          Content="Save debug"
-                                          ToolTip="Save intermediate debug artifacts and processed images under LocalAppData/BobTools/DebugCaptures."
-                                          IsChecked="{Binding SaveDebugImages}" />
-                            </WrapPanel>
-
-                            <Border Margin="0,10,0,0"
-                                    Padding="10"
-                                    CornerRadius="10"
-                                    BorderThickness="1"
-                                    BorderBrush="#334155"
-                                    Background="#330F172A">
                                 <StackPanel>
-                                    <TextBlock Foreground="White" FontWeight="SemiBold" Text="Global Hotkey" />
-                                    <WrapPanel Margin="0,8,0,0" VerticalAlignment="Center">
-                                        <ComboBox Width="150"
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsOfflineMode}" Value="True">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </StackPanel.Style>
+                                    <ToggleButton x:Name="TopScanTargetSelectorButton"
+                                                  Width="240"
                                                   Height="30"
-                                                  Margin="0,0,10,8"
-                                                  ItemsSource="{Binding HotkeyModifierOptions}"
-                                                  SelectedValuePath="Value"
-                                                  SelectedValue="{Binding SelectedHotkeyModifiers}">
-                                            <ComboBox.ItemTemplate>
-                                                <DataTemplate>
-                                                    <TextBlock Text="{Binding DisplayName}" />
-                                                </DataTemplate>
-                                            </ComboBox.ItemTemplate>
-                                        </ComboBox>
-                                        <ComboBox Width="120"
-                                                  Height="30"
-                                                  Margin="0,0,10,8"
-                                                  ItemsSource="{Binding HotkeyKeyOptions}"
-                                                  SelectedValuePath="Value"
-                                                  SelectedValue="{Binding SelectedHotkeyVirtualKey}">
-                                            <ComboBox.ItemTemplate>
-                                                <DataTemplate>
-                                                    <TextBlock Text="{Binding DisplayName}" />
-                                                </DataTemplate>
-                                            </ComboBox.ItemTemplate>
-                                        </ComboBox>
-                                        <Button Padding="10,4"
-                                                Margin="0,0,10,8"
-                                                Content="Use Recommended"
-                                                Command="{Binding ApplyRecommendedHotkeyCommand}" />
-                                        <Button Padding="10,4"
-                                            Margin="0,0,10,8"
-                                            Content="{Binding HotkeyRecorderButtonLabel}"
-                                            Command="{Binding ToggleHotkeyRecordingCommand}" />
-                                        <TextBlock Margin="0,4,0,8"
-                                                   Foreground="#E5E7EB"
-                                                   Text="{Binding ConfiguredHotkeySummary}" />
-                                    </WrapPanel>
-                                    <TextBlock Foreground="#93C5FD"
-                                               Text="{Binding RecommendedHotkeySummary}"
-                                               TextWrapping="Wrap" />
-                                        <TextBlock Margin="0,4,0,0"
-                                               Foreground="#E5E7EB"
-                                               Text="{Binding HotkeyRecorderSummary}"
-                                               TextWrapping="Wrap" />
-                                    <TextBlock Margin="0,4,0,0"
-                                               Foreground="#94A3B8"
-                                               Text="{Binding HotkeyRegistrationStatus}"
-                                               TextWrapping="Wrap" />
+                                                  HorizontalAlignment="Left"
+                                                  Padding="10,6"
+                                                  Background="#0F172A"
+                                                  BorderBrush="#475569"
+                                                  Foreground="#E5E7EB"
+                                                  ToolTip="Checked resources are highlighted in the live queue when OCR matches them."
+                                                  IsChecked="{Binding IsScanTargetSelectorOpen, Mode=TwoWay}"
+                                                  Content="{Binding SelectedScanTargetsSummary}" />
+                                    <Popup PlacementTarget="{Binding ElementName=TopScanTargetSelectorButton}"
+                                           Placement="Bottom"
+                                           StaysOpen="False"
+                                           IsOpen="{Binding IsScanTargetSelectorOpen, Mode=TwoWay}">
+                                        <Border Margin="0,6,0,0"
+                                                Padding="12"
+                                                Width="320"
+                                                MaxHeight="320"
+                                                CornerRadius="10"
+                                                Background="#E6111827"
+                                                BorderBrush="#F59E0B"
+                                                BorderThickness="1">
+                                            <Grid>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="Auto" />
+                                                    <RowDefinition Height="*" />
+                                                </Grid.RowDefinitions>
+
+                                                <TextBlock Foreground="White" FontWeight="SemiBold" Text="Highlight matching scan resources" />
+                                                <WrapPanel Grid.Row="1" Margin="0,8,0,8">
+                                                    <Button Width="80" Margin="0,0,8,0" Content="Select All" Command="{Binding SelectAllScanTargetsCommand}" />
+                                                    <Button Width="80" Content="Clear" Command="{Binding ClearScanTargetsCommand}" />
+                                                </WrapPanel>
+                                                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                                                    <ItemsControl ItemsSource="{Binding ScanTargetOptions}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <CheckBox Margin="0,0,0,6"
+                                                                          Foreground="#E5E7EB"
+                                                                          Content="{Binding Resource}"
+                                                                          IsChecked="{Binding IsSelected, Mode=TwoWay}" />
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </ScrollViewer>
+                                            </Grid>
+                                        </Border>
+                                    </Popup>
                                 </StackPanel>
-                            </Border>
+                            </WrapPanel>
 
                             <StackPanel Margin="0,10,0,0">
                                 <StackPanel.Style>
@@ -428,6 +503,16 @@
 
             <TabControl Grid.Row="1" Margin="0,10,0,0" Background="#6B0F172A" BorderBrush="#334155" Foreground="White"
                         SelectedIndex="{Binding SelectedMainTabIndex, Mode=TwoWay}">
+                <TabControl.Style>
+                    <Style TargetType="TabControl">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsCompactMode}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TabControl.Style>
                 <TabItem Header="Live Results">
                     <Grid Margin="10">
                         <Grid.RowDefinitions>
@@ -453,68 +538,6 @@
                                         </Style.Triggers>
                                     </Style>
                                 </StackPanel.Style>
-                                <TextBlock Foreground="#A7F3D0" FontWeight="SemiBold" Text="{Binding SignatureResourceSummary}" TextWrapping="Wrap" />
-                                <StackPanel Margin="0,8,0,0">
-                                    <ToggleButton x:Name="ScanTargetSelectorButton"
-                                                  Width="260"
-                                                  HorizontalAlignment="Left"
-                                                  Padding="10,6"
-                                                  Background="#0F172A"
-                                                  BorderBrush="#475569"
-                                                  Foreground="#E5E7EB"
-                                                  IsChecked="{Binding IsScanTargetSelectorOpen, Mode=TwoWay}"
-                                                  Content="{Binding SelectedScanTargetsSummary}" />
-                                    <Popup PlacementTarget="{Binding ElementName=ScanTargetSelectorButton}"
-                                           Placement="Bottom"
-                                           StaysOpen="False"
-                                           IsOpen="{Binding IsScanTargetSelectorOpen, Mode=TwoWay}">
-                                        <Border Margin="0,6,0,0"
-                                                Padding="12"
-                                                Width="320"
-                                                MaxHeight="320"
-                                                CornerRadius="10"
-                                                Background="#E6111827"
-                                                BorderBrush="#F59E0B"
-                                                BorderThickness="1">
-                                            <Grid>
-                                                <Grid.RowDefinitions>
-                                                    <RowDefinition Height="Auto" />
-                                                    <RowDefinition Height="Auto" />
-                                                    <RowDefinition Height="*" />
-                                                </Grid.RowDefinitions>
-
-                                                <TextBlock Foreground="White" FontWeight="SemiBold" Text="Highlight matching scan resources" />
-                                                <WrapPanel Grid.Row="1" Margin="0,8,0,8">
-                                                    <Button Width="80" Margin="0,0,8,0" Content="Select All" Command="{Binding SelectAllScanTargetsCommand}" />
-                                                    <Button Width="80" Content="Clear" Command="{Binding ClearScanTargetsCommand}" />
-                                                </WrapPanel>
-                                                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
-                                                    <ItemsControl ItemsSource="{Binding ScanTargetOptions}">
-                                                        <ItemsControl.ItemTemplate>
-                                                            <DataTemplate>
-                                                                <CheckBox Margin="0,0,0,6"
-                                                                          Foreground="#E5E7EB"
-                                                                          Content="{Binding Resource}"
-                                                                          IsChecked="{Binding IsSelected, Mode=TwoWay}" />
-                                                            </DataTemplate>
-                                                        </ItemsControl.ItemTemplate>
-                                                    </ItemsControl>
-                                                </ScrollViewer>
-                                            </Grid>
-                                        </Border>
-                                    </Popup>
-                                    <TextBlock Margin="0,6,0,0"
-                                               Foreground="#94A3B8"
-                                               Text="Checked resources are highlighted in the live queue when OCR matches them."
-                                               TextWrapping="Wrap" />
-                                </StackPanel>
-                                    <WrapPanel Margin="0,8,0,0" VerticalAlignment="Center">
-                                        <TextBlock Margin="0,4,12,0" Foreground="#E5E7EB" Text="{Binding LiveScanQueueSummary}" TextWrapping="Wrap" />
-                                        <Button Padding="10,4"
-                                                Command="{Binding ExportScanTrainingPackageCommand}"
-                                                Content="Export Training Zip" />
-                                    </WrapPanel>
-                                <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" Text="{Binding CurrentSessionId, StringFormat=Session: {0}}" TextWrapping="Wrap" />
                             </StackPanel>
                             <StackPanel>
                                 <StackPanel.Style>
@@ -527,9 +550,6 @@
                                         </Style.Triggers>
                                     </Style>
                                 </StackPanel.Style>
-                                <TextBlock Margin="0,2,0,0" Foreground="#93C5FD" FontWeight="SemiBold" Text="{Binding MiningRockSummary}" TextWrapping="Wrap" />
-                                <TextBlock Margin="0,8,0,0" Foreground="#E5E7EB" Text="{Binding LiveMiningQueueSummary}" TextWrapping="Wrap" />
-                                <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" Text="{Binding CurrentSessionId, StringFormat=Session: {0}}" TextWrapping="Wrap" />
                             </StackPanel>
                             <TextBlock Foreground="#94A3B8" TextWrapping="Wrap" Text="Offline mode uses queued folder import only.">
                                 <TextBlock.Style>
@@ -558,7 +578,6 @@
                                             </Style.Triggers>
                                         </Style>
                                     </StackPanel.Style>
-                                    <TextBlock Margin="0,0,0,10" Foreground="#94A3B8" Text="Scan captures are queued and processed in the background. Newest captures appear first." TextWrapping="Wrap" />
                                     <ItemsControl ItemsSource="{Binding LiveScanResults}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
@@ -607,12 +626,12 @@
                                                             </TextBlock>
                                                             <TextBlock Foreground="#A7F3D0" FontWeight="SemiBold" Text="{Binding SignatureResourceSummary}" TextWrapping="Wrap" />
                                                             <TextBlock Margin="0,4,0,0" Foreground="#94A3B8" Text="{Binding OcrSourceSummary}" TextWrapping="Wrap" />
-                                                            <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" Text="{Binding UsedOcrModeSummary, StringFormat=OCR Mode: {0}}" TextWrapping="Wrap" />
+                                                            <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" Text="{Binding UsedOcrModeSummary}" TextWrapping="Wrap" />
 
                                                             <TextBlock Margin="0,10,0,0"
                                                                        Foreground="#94A3B8"
                                                                        FontWeight="SemiBold"
-                                                                       Text="Detected value" />
+                                                                       Text="Detected" />
                                                             <TextBox Margin="0,4,0,0"
                                                                      MinHeight="88"
                                                                      Text="{Binding OcrText}"
@@ -627,7 +646,7 @@
                                                             <TextBlock Margin="0,10,0,0"
                                                                        Foreground="#94A3B8"
                                                                        FontWeight="SemiBold"
-                                                                       Text="Correct value" />
+                                                                       Text="Corrected" />
                                                             <TextBox Margin="0,4,0,0"
                                                                      Text="{Binding CorrectValue, UpdateSourceTrigger=PropertyChanged}"
                                                                      Background="#0F172A"
@@ -657,7 +676,6 @@
                                             </Style.Triggers>
                                         </Style>
                                     </StackPanel.Style>
-                                    <TextBlock Margin="0,0,0,10" Foreground="#94A3B8" Text="Mining captures are queued immediately and processed in the background. Newest captures appear first." TextWrapping="Wrap" />
                                     <ItemsControl ItemsSource="{Binding LiveMiningResults}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
@@ -1410,7 +1428,420 @@
                 </TabItem>
             </TabControl>
 
+            <Border Grid.RowSpan="3"
+                    Margin="0"
+                    Padding="12"
+                    CornerRadius="18"
+                    Background="#C90B213A"
+                    BorderBrush="#667DD3FC"
+                    BorderThickness="1.2">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Setter Property="Background" Value="#C90B213A" />
+                        <Setter Property="BorderBrush" Value="#667DD3FC" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsCompactMode}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsScanningMode}" Value="True">
+                                <Setter Property="Background" Value="#C90B213A" />
+                                <Setter Property="BorderBrush" Value="#7B7DD3FC" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsMiningMode}" Value="True">
+                                <Setter Property="Background" Value="#C908221C" />
+                                <Setter Property="BorderBrush" Value="#7B5DE2C1" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <Grid>
+                    <Grid.LayoutTransform>
+                        <ScaleTransform ScaleX="{Binding CompactModeScale}"
+                                        ScaleY="{Binding CompactModeScale}" />
+                    </Grid.LayoutTransform>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel>
+                            <WrapPanel VerticalAlignment="Center">
+                                <Border Padding="12,4"
+                                        Margin="0,0,8,6"
+                                        CornerRadius="999"
+                                        MinWidth="74"
+                                        BorderThickness="1">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="#0C4A6E" />
+                                            <Setter Property="BorderBrush" Value="#38BDF8" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsMiningMode}" Value="True">
+                                                    <Setter Property="Background" Value="#0B5348" />
+                                                    <Setter Property="BorderBrush" Value="#5EEAD4" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock Foreground="White"
+                                               HorizontalAlignment="Center"
+                                               FontSize="9"
+                                               FontWeight="Bold"
+                                               Text="{Binding CompactModeBadgeLabel}" />
+                                </Border>
+                                <TextBlock Margin="0,0,0,6"
+                                           Foreground="White"
+                                           FontSize="18"
+                                           FontWeight="Bold"
+                                           Text="BobTools" />
+                            </WrapPanel>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                            <Button Width="28" Height="28" Margin="0,0,8,0" Click="MinimizeButton_Click" Content="—"
+                                    Background="#334155" Foreground="White" BorderBrush="#475569" />
+                            <Button Width="28" Height="28" Click="CloseButton_Click" Content="✕"
+                                    Background="#7F1D1D" Foreground="White" BorderBrush="#991B1B" />
+                        </StackPanel>
+                    </Grid>
+
+                    <WrapPanel Grid.Row="1" Margin="0,14,0,14">
+                        <Button Style="{StaticResource CompactSelectAreaButtonStyle}"
+                                Command="{Binding SelectActiveRegionCommand}"
+                                ToolTip="{Binding ActiveRegionButtonLabel}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Viewbox Width="24" Height="24" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                    <Grid Width="24" Height="24">
+                                        <Rectangle Width="16" Height="16" Stroke="#D8F3FF" StrokeThickness="1.2" StrokeDashArray="1.4,1.1" Opacity="0.85" />
+                                        <Path Stroke="#FFFFFF" StrokeThickness="1.8" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M2,8 L2,2 L8,2 M16,2 L22,2 L22,8 M22,16 L22,22 L16,22 M8,22 L2,22 L2,16" />
+                                    </Grid>
+                                </Viewbox>
+                                <TextBlock Grid.Row="1" Margin="0,5,0,0" Foreground="White" FontSize="12" FontWeight="Bold" Text="Set Area" />
+                            </Grid>
+                        </Button>
+
+                        <Button Style="{StaticResource CompactCaptureButtonStyle}"
+                                Command="{Binding CaptureActiveModeCommand}"
+                                ToolTip="{Binding ActiveCaptureButtonLabel}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Viewbox Width="24" Height="24" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                    <Grid Width="24" Height="24">
+                                        <Path Fill="#ECFDF5" Data="M7,5 L10,5 L11.5,3.5 L16.5,3.5 L18,5 L20,5 C21.1,5 22,5.9 22,7 L22,18 C22,19.1 21.1,20 20,20 L4,20 C2.9,20 2,19.1 2,18 L2,7 C2,5.9 2.9,5 4,5 Z" Opacity="0.95" />
+                                        <Ellipse Width="7.2" Height="7.2" Stroke="#0B3B2E" StrokeThickness="1.6" Fill="#34D399" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <Ellipse Width="2.1" Height="2.1" Fill="#0B3B2E" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,7,5.2,0" />
+                                    </Grid>
+                                </Viewbox>
+                                <TextBlock Grid.Row="1" Margin="0,5,0,0" Foreground="White" FontSize="12" FontWeight="Bold" Text="Capture" />
+                            </Grid>
+                        </Button>
+
+                        <Button Style="{StaticResource CompactModeSwitchButtonStyle}"
+                                Command="{Binding ToggleCompactWorkflowModeCommand}"
+                                ToolTip="{Binding CompactWorkflowToggleLabel}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Viewbox Width="24" Height="24" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                    <Grid Width="24" Height="24">
+                                        <Path Fill="#FEF3C7" Data="M6,6 L14,6 L11.6,3.6 L13.4,1.8 L18.8,7.2 L13.4,12.6 L11.6,10.8 L14,8.4 L6,8.4 Z" />
+                                        <Path Fill="#FCD34D" Data="M18,18 L10,18 L12.4,20.4 L10.6,22.2 L5.2,16.8 L10.6,11.4 L12.4,13.2 L10,15.6 L18,15.6 Z" />
+                                    </Grid>
+                                </Viewbox>
+                                <TextBlock Grid.Row="1" Margin="0,5,0,0" Foreground="White" FontSize="12" FontWeight="Bold" Text="Mode" />
+                            </Grid>
+                        </Button>
+
+                        <Button Style="{StaticResource CompactViewToggleButtonStyle}"
+                                Margin="0,0,0,10"
+                                Command="{Binding ToggleCompactModeCommand}"
+                                ToolTip="{Binding CompactModeToggleLabel}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Viewbox Width="24" Height="24" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                    <Grid Width="24" Height="24">
+                                        <Rectangle Width="18" Height="12" RadiusX="1.6" RadiusY="1.6" Stroke="#E0E7FF" StrokeThickness="1.5" />
+                                        <Rectangle Width="9" Height="10" RadiusX="1.2" RadiusY="1.2" Stroke="#C7D2FE" StrokeThickness="1.5" HorizontalAlignment="Right" VerticalAlignment="Bottom" />
+                                    </Grid>
+                                </Viewbox>
+                                <TextBlock Grid.Row="1" Margin="0,5,0,0" Foreground="White" FontSize="12" FontWeight="Bold" Text="Overlay" />
+                            </Grid>
+                        </Button>
+
+                        <Button Style="{StaticResource CompactSettingsButtonStyle}"
+                                Margin="0,0,0,10"
+                                Click="OpenSettingsButton_Click"
+                                ToolTip="Open overlay settings">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Viewbox Width="24" Height="24" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                    <Grid Width="24" Height="24">
+                                        <Ellipse Width="8" Height="8" Fill="#E2E8F0" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <Ellipse Width="17" Height="17" Stroke="#E2E8F0" StrokeThickness="1.6" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <Path Stroke="#E2E8F0" StrokeThickness="1.7" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Data="M12,1.8 L12,4.4 M12,19.6 L12,22.2 M1.8,12 L4.4,12 M19.6,12 L22.2,12 M4.7,4.7 L6.5,6.5 M17.5,17.5 L19.3,19.3 M17.5,6.5 L19.3,4.7 M4.7,19.3 L6.5,17.5" />
+                                    </Grid>
+                                </Viewbox>
+                                <TextBlock Grid.Row="1" Margin="0,5,0,0" Foreground="White" FontSize="12" FontWeight="Bold" Text="Settings" />
+                            </Grid>
+                        </Button>
+                    </WrapPanel>
+
+                    <Grid Grid.Row="2">
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsScanningMode}" Value="False">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+
+                        <TextBlock Foreground="#94A3B8"
+                                   VerticalAlignment="Center"
+                                   Text="No scan captures yet. Set the scan area, then fire a capture to populate the compact row.">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding LatestLiveScanResult}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <Border Padding="14"
+                                CornerRadius="14"
+                                Background="#101827"
+                                BorderBrush="#1D4ED8"
+                                BorderThickness="1.2">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding LatestLiveScanResult}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <StackPanel>
+                                <TextBlock Foreground="#BFDBFE"
+                                           FontSize="10"
+                                           FontWeight="SemiBold"
+                                           Text="Recent signatures"
+                                           TextWrapping="Wrap" />
+                                <ScrollViewer Margin="0,8,0,0"
+                                              MaxHeight="84"
+                                              VerticalScrollBarVisibility="Auto"
+                                              HorizontalScrollBarVisibility="Disabled">
+                                    <ItemsControl ItemsSource="{Binding LiveScanResults}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,0,0,4">
+                                                    <Grid.Style>
+                                                        <Style TargetType="Grid">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding CompactListIsValid}" Value="False">
+                                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Grid.Style>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto" />
+                                                        <ColumnDefinition Width="12" />
+                                                        <ColumnDefinition Width="*" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Foreground="White"
+                                                               FontSize="12"
+                                                               FontWeight="SemiBold"
+                                                               Text="{Binding CompactListSignature}" />
+                                                    <TextBlock Grid.Column="2"
+                                                               FontSize="12"
+                                                               Text="{Binding CompactListResource}">
+                                                        <TextBlock.Style>
+                                                            <Style TargetType="TextBlock">
+                                                                <Setter Property="Foreground" Value="#BFDBFE" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding CompactListResourceIsHighlighted}" Value="True">
+                                                                        <Setter Property="Foreground" Value="#FCD34D" />
+                                                                        <Setter Property="FontWeight" Value="Bold" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </TextBlock.Style>
+                                                    </TextBlock>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <Grid Grid.Row="2">
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Visible" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsMiningMode}" Value="False">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+
+                        <TextBlock Foreground="#94A3B8"
+                                   VerticalAlignment="Center"
+                                   Text="No mining captures yet. Set the mining area, then grab a rock to populate the compact row.">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding LatestLiveMiningResult}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+
+                        <Border Padding="14"
+                                CornerRadius="14"
+                                Background="#0F1F1B"
+                                BorderBrush="#0F766E"
+                                BorderThickness="1.2">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding LatestLiveMiningResult}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <StackPanel>
+                                <TextBlock FontSize="18"
+                                           FontWeight="Bold"
+                                           Text="{Binding LatestLiveMiningResult.CompactHeadline}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="White" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding LatestLiveMiningResult.CompactHeadlineIsHighlighted}" Value="True">
+                                                    <Setter Property="Foreground" Value="#FCD34D" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock Margin="0,4,0,0"
+                                           Foreground="#CCFBF1"
+                                           FontSize="11"
+                                           Text="{Binding LatestLiveMiningResult.CompactMetricsSummary}"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Margin="0,6,0,0"
+                                           Foreground="#7DD3FC"
+                                           FontSize="10"
+                                           FontWeight="SemiBold"
+                                           Text="Ore mix"
+                                           TextWrapping="Wrap" />
+                                <ItemsControl Margin="0,4,0,0"
+                                              ItemsSource="{Binding LatestLiveMiningResult.CompactOreItems}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Margin="0,0,6,6"
+                                                    Padding="6,3"
+                                                    CornerRadius="999"
+                                                    Background="#052E2B"
+                                                    BorderBrush="#0F766E"
+                                                    BorderThickness="1">
+                                                <Border.Style>
+                                                    <Style TargetType="Border">
+                                                        <Setter Property="Background" Value="#052E2B" />
+                                                        <Setter Property="BorderBrush" Value="#0F766E" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsHighlighted}" Value="True">
+                                                                <Setter Property="Background" Value="#3F3A2200" />
+                                                                <Setter Property="BorderBrush" Value="#F59E0B" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Border.Style>
+                                                <TextBlock FontSize="10"
+                                                           Foreground="#D1FAE5"
+                                                           Text="{Binding DisplayText}" />
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Margin="0,2,0,0"
+                                           Foreground="#94A3B8"
+                                           FontSize="10"
+                                           Text="Highest quality ore is accented when quality values are available.">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding LatestLiveMiningResult.HasCompactOreItems}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Border>
+
             <Border Grid.Row="2" Margin="0,10,0,0" Padding="10,8" CornerRadius="8" Background="#8A0F172A" BorderBrush="#334155" BorderThickness="1">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Visibility" Value="Visible" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsCompactMode}" Value="True">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -1420,12 +1851,15 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="16" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
                     <TextBlock Text="{Binding Status}" Foreground="#E5E7EB" />
-                    <TextBlock Grid.Column="2" Foreground="#94A3B8" Text="{Binding LastUsedOcrMode}" />
-                    <TextBlock Grid.Column="4" Foreground="{Binding LastOcrSourceBrush}" Text="{Binding LastOcrSourceSummary}" />
-                    <TextBlock Grid.Column="6" Foreground="#94A3B8" Text="{Binding HotkeyTargetSummary}" />
+                    <TextBlock Grid.Column="2" Foreground="#94A3B8" Text="{Binding LiveFooterSummary}" />
+                    <TextBlock Grid.Column="4" Foreground="#94A3B8" Text="{Binding LastUsedOcrMode}" />
+                    <TextBlock Grid.Column="6" Foreground="{Binding LastOcrSourceBrush}" Text="{Binding LastOcrSourceSummary}" />
+                    <TextBlock Grid.Column="8" Foreground="#94A3B8" Text="{Binding HotkeyTargetSummary}" />
                 </Grid>
             </Border>
         </Grid>

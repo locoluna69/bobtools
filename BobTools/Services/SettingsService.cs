@@ -69,6 +69,23 @@ public sealed class SettingsService : ISettingsService
         settings.LastLocationKey ??= string.Empty;
         settings.RsiHandle ??= string.Empty;
         settings.SelectedScanResources ??= [];
+        if (double.IsNaN(settings.OverlayOpacity) || double.IsInfinity(settings.OverlayOpacity))
+        {
+            settings.OverlayOpacity = AppSettings.DefaultOverlayOpacity;
+        }
+
+        settings.OverlayOpacity = Math.Clamp(settings.OverlayOpacity, AppSettings.MinOverlayOpacity, AppSettings.MaxOverlayOpacity);
+
+        if (double.IsNaN(settings.CompactModeScale) || double.IsInfinity(settings.CompactModeScale))
+        {
+            settings.CompactModeScale = AppSettings.DefaultCompactModeScale;
+        }
+
+        settings.CompactModeScale = Math.Clamp(settings.CompactModeScale, AppSettings.MinCompactModeScale, AppSettings.MaxCompactModeScale);
+        settings.FullModeWindowWidth = NormalizeWindowDimension(settings.FullModeWindowWidth);
+        settings.FullModeWindowHeight = NormalizeWindowDimension(settings.FullModeWindowHeight);
+        settings.CompactModeWindowWidth = NormalizeWindowDimension(settings.CompactModeWindowWidth);
+        settings.CompactModeWindowHeight = NormalizeWindowDimension(settings.CompactModeWindowHeight);
         settings.LifetimeSignatureCount = Math.Max(0, settings.LifetimeSignatureCount);
         settings.LifetimeRockCount = Math.Max(0, settings.LifetimeRockCount);
         settings.LifetimeHighValueOreCount = Math.Max(0, settings.LifetimeHighValueOreCount);
@@ -81,5 +98,12 @@ public sealed class SettingsService : ISettingsService
         Directory.CreateDirectory(Path.GetDirectoryName(_settingsPath)!);
         var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
         File.WriteAllText(_settingsPath, json);
+    }
+
+    private static double NormalizeWindowDimension(double value)
+    {
+        return double.IsNaN(value) || double.IsInfinity(value) || value <= 0
+            ? 0
+            : value;
     }
 }

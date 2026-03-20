@@ -81,6 +81,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool isRecordingHotkey;
     [ObservableProperty] private string hotkeyRecorderSummary = "Click Record Shortcut, then press the key combination you want BobTools to use.";
     [ObservableProperty] private string hotkeyRecorderButtonLabel = "Record Shortcut";
+    [ObservableProperty] private double overlayOpacity = AppSettings.DefaultOverlayOpacity;
+    [ObservableProperty] private double compactModeScale = AppSettings.DefaultCompactModeScale;
+    [ObservableProperty] private string overlaySettingsSummary = string.Empty;
+    [ObservableProperty] private bool isCompactMode;
+    [ObservableProperty] private LiveScanResultItem? latestLiveScanResult;
+    [ObservableProperty] private OfflineMiningResultItem? latestLiveMiningResult;
     [ObservableProperty] private string offlineSelectedCaptureProfile = CaptureProfileCatalog.Signature;
     [ObservableProperty] private ImageSource? offlinePreviewImage;
     [ObservableProperty] private string offlineImagePath = "Drop an image here to test Scan or Mining OCR.";
@@ -118,6 +124,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public ICommand ExportScanTrainingPackageCommand { get; }
     public ICommand ApplyRecommendedHotkeyCommand { get; }
     public ICommand ToggleHotkeyRecordingCommand { get; }
+    public ICommand ToggleCompactModeCommand { get; }
+    public ICommand ToggleCompactWorkflowModeCommand { get; }
+    public ICommand SelectActiveRegionCommand { get; }
+    public ICommand CaptureActiveModeCommand { get; }
     public ICommand ReplayDebugFolderCommand { get; }
     public ICommand RunOfflineTestCommand { get; }
     public IAsyncRelayCommand SaveOfflineMiningEditsCommand { get; }
@@ -144,10 +154,23 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public bool IsScanningMode => string.Equals(SelectedWorkflowMode, WorkflowModeCatalog.Scanning, StringComparison.OrdinalIgnoreCase);
     public bool IsMiningMode => string.Equals(SelectedWorkflowMode, WorkflowModeCatalog.Mining, StringComparison.OrdinalIgnoreCase);
     public bool IsOfflineMode => string.Equals(SelectedWorkflowMode, WorkflowModeCatalog.Offline, StringComparison.OrdinalIgnoreCase);
+    public string LiveFooterSummary => SelectedWorkflowMode switch
+    {
+        WorkflowModeCatalog.Scanning => LiveScanQueueSummary,
+        WorkflowModeCatalog.Mining => LiveMiningQueueSummary,
+        WorkflowModeCatalog.Offline => "Offline mode uses queued folder import only.",
+        _ => string.Empty
+    };
     public bool IsSessionContextComplete => !string.IsNullOrWhiteSpace(SessionRsiHandle)
         && !string.IsNullOrWhiteSpace(SelectedSessionShip)
         && !string.IsNullOrWhiteSpace(SelectedSessionSystem)
         && SelectedSessionLocation is not null;
+    public string CompactModeToggleLabel => IsCompactMode ? "Full View" : "Compact Mode";
+    public string ActiveRegionButtonLabel => IsMiningMode ? "Set Mining Area" : "Set Scan Area";
+    public string ActiveCaptureButtonLabel => IsMiningMode ? "Capture Mining" : "Capture Scan";
+    public string CompactWorkflowToggleLabel => IsMiningMode ? "Switch To Scan" : "Switch To Mining";
+    public string CompactModeBadgeLabel => IsMiningMode ? "MINING" : "SCAN";
+    public string CompactModeSubtitle => IsMiningMode ? "Ore sweep and fracture stats" : "Signature sweep and target hits";
 
     public MainViewModel(ISettingsService settingsService, ISessionHistoryService sessionHistoryService, IScreenCaptureService screenCaptureService, IOcrService ocrService, IRsiProfileImageService rsiProfileImageService)
     {
@@ -161,6 +184,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         captureOnlyMode = _settings.CaptureOnlyMode;
         selectedHotkeyModifiers = _settings.HotkeyModifiers;
         selectedHotkeyVirtualKey = _settings.HotkeyVirtualKey;
+        overlayOpacity = _settings.OverlayOpacity;
+        compactModeScale = _settings.CompactModeScale;
+        isCompactMode = false;
         lifetimeSignatureCount = _settings.LifetimeSignatureCount;
         lifetimeRockCount = _settings.LifetimeRockCount;
         lifetimeHighValueOreCount = _settings.LifetimeHighValueOreCount;
@@ -184,6 +210,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (!string.Equals(_settings.ActiveCaptureProfile, CaptureProfileCatalog.Signature, StringComparison.OrdinalIgnoreCase))
         {
             _settings.ActiveCaptureProfile = CaptureProfileCatalog.Signature;
+            settingsChanged = true;
+        }
+
+        if (_settings.IsCompactMode)
+        {
+            _settings.IsCompactMode = false;
             settingsChanged = true;
         }
 
@@ -212,6 +244,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _overlayRefreshTimer.Start();
         _liveScanQueueTask = Task.Run(() => ProcessLiveScanQueueAsync(_liveMiningQueueCancellation.Token));
         _liveMiningQueueTask = Task.Run(() => ProcessLiveMiningQueueAsync(_liveMiningQueueCancellation.Token));
+        LiveScanResults.CollectionChanged += (_, _) => UpdateCompactResults();
+        LiveMiningResults.CollectionChanged += (_, _) => UpdateCompactResults();
         LoadScanTargetOptions();
         LoadMiningSessionContextOptions();
         LoadPersistedLiveResults();
@@ -219,6 +253,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         UpdateLiveScanQueueSummary();
         UpdateConfiguredHotkeySummary();
         UpdateHotkeyTargetSummary();
+        UpdateOverlaySettingsSummary();
         UpdateCaptureOverlay();
 
         SelectSignatureRegionCommand = new RelayCommand(() => SelectRegion(CaptureProfileCatalog.Signature));
@@ -233,6 +268,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
         ExportScanTrainingPackageCommand = new RelayCommand(ExportScanTrainingPackage);
         ApplyRecommendedHotkeyCommand = new RelayCommand(ApplyRecommendedHotkey);
         ToggleHotkeyRecordingCommand = new RelayCommand(ToggleHotkeyRecording);
+        ToggleCompactModeCommand = new RelayCommand(ToggleCompactMode);
+        ToggleCompactWorkflowModeCommand = new RelayCommand(ToggleCompactWorkflowMode);
+        SelectActiveRegionCommand = new RelayCommand(SelectActiveRegion);
+        CaptureActiveModeCommand = new AsyncRelayCommand(CaptureActiveModeAsync);
         ReplayDebugFolderCommand = new AsyncRelayCommand(ReplayDebugFolderAsync);
         RunOfflineTestCommand = new AsyncRelayCommand(RunOfflineTestAsync);
         SaveOfflineMiningEditsCommand = new AsyncRelayCommand(SaveOfflineMiningEditsAsync, () => SelectedOfflineMiningResult is not null);
@@ -240,6 +279,47 @@ public partial class MainViewModel : ObservableObject, IDisposable
         DeleteOfflineMiningRowCommand = new RelayCommand<OfflineMiningElementEditRow>(DeleteOfflineMiningRow);
         SelectAllScanTargetsCommand = new RelayCommand(() => SetAllScanTargets(true));
         ClearScanTargetsCommand = new RelayCommand(() => SetAllScanTargets(false));
+    }
+    partial void OnIsCompactModeChanged(bool value)
+    {
+        _settings.IsCompactMode = value;
+        _settingsService.Save(_settings);
+
+        if (value && IsOfflineMode)
+        {
+            SelectedWorkflowMode = WorkflowModeCatalog.Scanning;
+        }
+
+        OnPropertyChanged(nameof(CompactModeToggleLabel));
+    }
+    private void UpdateCompactResults()
+    {
+        LatestLiveScanResult = LiveScanResults.FirstOrDefault();
+        LatestLiveMiningResult = LiveMiningResults.FirstOrDefault();
+    }
+    private void ToggleCompactMode()
+    {
+        IsCompactMode = !IsCompactMode;
+        Status = IsCompactMode
+            ? "Compact mode enabled for primary-screen overlay use."
+            : "Full companion mode restored.";
+    }
+
+    private void ToggleCompactWorkflowMode()
+    {
+        SelectedWorkflowMode = IsMiningMode
+            ? WorkflowModeCatalog.Scanning
+            : WorkflowModeCatalog.Mining;
+    }
+
+    private void SelectActiveRegion()
+    {
+        SelectRegion(IsMiningMode ? CaptureProfileCatalog.Mining : CaptureProfileCatalog.Signature);
+    }
+
+    private Task CaptureActiveModeAsync()
+    {
+        return CaptureAndReviewAsync(IsMiningMode ? CaptureProfileCatalog.Mining : CaptureProfileCatalog.Signature);
     }
 
     public Task CaptureAndReviewAsync()
@@ -670,6 +750,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         PersistSelectedScanTargets();
         UpdateSelectedScanTargetsSummary();
         UpdateLiveScanTargetHighlights();
+        UpdateLiveMiningTargetHighlights();
     }
 
     private void ScanTargetOption_PropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -682,6 +763,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         PersistSelectedScanTargets();
         UpdateSelectedScanTargetsSummary();
         UpdateLiveScanTargetHighlights();
+        UpdateLiveMiningTargetHighlights();
     }
 
     private void SetAllScanTargets(bool isSelected)
@@ -702,6 +784,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         PersistSelectedScanTargets();
         UpdateSelectedScanTargetsSummary();
         UpdateLiveScanTargetHighlights();
+        UpdateLiveMiningTargetHighlights();
     }
 
     private void PersistSelectedScanTargets()
@@ -738,6 +821,15 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    private void UpdateLiveMiningTargetHighlights()
+    {
+        var selectedTargets = GetSelectedScanTargets();
+        foreach (var resultItem in LiveMiningResults)
+        {
+            resultItem.ApplySelectedTargetResources(selectedTargets);
+        }
+    }
+
     private void LoadPersistedLiveResults()
     {
         LiveScanResults.Clear();
@@ -765,6 +857,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
 
         UpdateLiveScanTargetHighlights();
+        UpdateLiveMiningTargetHighlights();
         UpdateLiveScanQueueSummary();
         UpdateLiveMiningQueueSummary();
     }
@@ -979,6 +1072,22 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _settings.CaptureOnlyMode = value;
         _settingsService.Save(_settings);
         UpdateHotkeyTargetSummary();
+        UpdateOverlaySettingsSummary();
+        OnPropertyChanged(nameof(ActiveCaptureButtonLabel));
+    }
+
+    partial void OnOverlayOpacityChanged(double value)
+    {
+        _settings.OverlayOpacity = Math.Clamp(value, AppSettings.MinOverlayOpacity, AppSettings.MaxOverlayOpacity);
+        _settingsService.Save(_settings);
+        UpdateOverlaySettingsSummary();
+    }
+
+    partial void OnCompactModeScaleChanged(double value)
+    {
+        _settings.CompactModeScale = Math.Clamp(value, AppSettings.MinCompactModeScale, AppSettings.MaxCompactModeScale);
+        _settingsService.Save(_settings);
+        UpdateOverlaySettingsSummary();
     }
 
     partial void OnSelectedHotkeyModifiersChanged(uint value)
@@ -1046,6 +1155,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsScanningMode));
         OnPropertyChanged(nameof(IsMiningMode));
         OnPropertyChanged(nameof(IsOfflineMode));
+        OnPropertyChanged(nameof(ActiveRegionButtonLabel));
+        OnPropertyChanged(nameof(ActiveCaptureButtonLabel));
+        OnPropertyChanged(nameof(CompactWorkflowToggleLabel));
+        OnPropertyChanged(nameof(CompactModeBadgeLabel));
+        OnPropertyChanged(nameof(CompactModeSubtitle));
+        OnPropertyChanged(nameof(LiveFooterSummary));
         if (!string.Equals(value, WorkflowModeCatalog.Scanning, StringComparison.OrdinalIgnoreCase))
         {
             IsScanTargetSelectorOpen = false;
@@ -1905,6 +2020,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
         RecommendedHotkeySummary = $"Recommended for Star Citizen overlays: {HotkeyCatalog.RecommendedDisplay}";
     }
 
+    private void UpdateOverlaySettingsSummary()
+    {
+        OverlaySettingsSummary = $"Capture only: {(CaptureOnlyMode ? "On" : "Off")}  |  Save debug: {(SaveDebugImages ? "On" : "Off")}  |  Transparency: {OverlayOpacity:P0}  |  Compact scale: {CompactModeScale:P0}";
+    }
+
     private void ApplyRecommendedHotkey()
     {
         SelectedHotkeyModifiers = HotkeyCatalog.RecommendedModifiers;
@@ -2473,6 +2593,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         LiveMiningQueueSummary = LiveMiningResults.Count == 0
             ? "No live mining captures yet."
             : $"Results: {LiveMiningResults.Count} | Active jobs: {processingCount} | Current session: {CurrentSessionId}";
+        OnPropertyChanged(nameof(LiveFooterSummary));
     }
 
     private void UpdateLiveScanQueueSummary()
@@ -2481,6 +2602,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         LiveScanQueueSummary = LiveScanResults.Count == 0
             ? "No live scan captures yet."
             : $"Results: {LiveScanResults.Count} | Active jobs: {processingCount} | Current session: {CurrentSessionId}";
+        OnPropertyChanged(nameof(LiveFooterSummary));
     }
 
     private static string CreateLiveCaptureDirectory(string captureProfile)

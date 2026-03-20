@@ -2,6 +2,7 @@ using BobTools.Interop;
 using BobTools.Services;
 using BobTools.Utils;
 using BobTools.ViewModels;
+using BobTools.Views;
 using System.ComponentModel;
 using System.IO;
 using System.Text;
@@ -13,9 +14,24 @@ namespace BobTools;
 
 public partial class MainWindow : Window
 {
+    private const double FullModeDefaultWidth = 1460;
+    private const double FullModeDefaultHeight = 620;
+    private const double FullModeMinWidth = 980;
+    private const double FullModeMinHeight = 420;
+    private const double CompactModeBaseDefaultWidth = 560;
+    private const double CompactModeBaseDefaultHeight = 248;
+    private const double CompactModeBaseMinWidth = 420;
+    private const double CompactModeBaseMinHeight = 220;
+    private const double CompactModeMinimumWidthFloor = 280;
+    private const double CompactModeMinimumHeightFloor = 140;
+    private const double CompactModeChromeWidth = 40;
+    private const double CompactModeChromeHeight = 44;
+
     private readonly IHotkeyService _hotkeyService;
     private readonly MainViewModel _viewModel;
+    private readonly ISettingsService _settingsService;
     private readonly Models.AppSettings _settings;
+    private bool _isApplyingWindowModeLayout;
 
     public MainWindow()
     {
@@ -33,6 +49,7 @@ public partial class MainWindow : Window
         sessionHistoryService.Initialize();
 
         _hotkeyService = new HotkeyService();
+        _settingsService = settingsService;
         _settings = settingsService.Load();
         _viewModel = new MainViewModel(
             settingsService,
@@ -45,6 +62,7 @@ public partial class MainWindow : Window
         SourceInitialized += MainWindow_SourceInitialized;
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
+        SizeChanged += MainWindow_SizeChanged;
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         _hotkeyService.HotkeyPressed += HotkeyService_HotkeyPressed;
         _viewModel.PropertyChanged += ViewModel_PropertyChanged;
@@ -69,7 +87,7 @@ public partial class MainWindow : Window
 
     private void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        PositionOverlayAtTop();
+        ApplyWindowModeLayout(isInitialLayout: true);
     }
 
     private void MainWindow_SourceInitialized(object? sender, EventArgs e)
@@ -81,12 +99,72 @@ public partial class MainWindow : Window
         TryRegisterHotkey();
     }
 
-    private void PositionOverlayAtTop()
+    private void ApplyWindowModeLayout(bool isInitialLayout, bool preferPersistedSize = true)
     {
         var workArea = SystemParameters.WorkArea;
-        Width = Math.Min(Math.Max(MinWidth, workArea.Width - 32), 1600);
-        Left = workArea.Left + ((workArea.Width - Width) / 2);
-        Top = workArea.Top + 8;
+        _isApplyingWindowModeLayout = true;
+
+        try
+        {
+            if (_viewModel.IsCompactMode)
+            {
+                var compactMinWidth = GetCompactMinWidth();
+                var compactMinHeight = GetCompactMinHeight();
+                var compactDefaultWidth = GetCompactDefaultWidth();
+                var compactDefaultHeight = GetCompactDefaultHeight();
+                var targetWidth = preferPersistedSize && _settings.CompactModeWindowWidth > 0
+                    ? _settings.CompactModeWindowWidth
+                    : isInitialLayout || Width > 760
+                        ? compactDefaultWidth
+                        : Width;
+                var targetHeight = preferPersistedSize && _settings.CompactModeWindowHeight > 0
+                    ? _settings.CompactModeWindowHeight
+                    : isInitialLayout || Height > 420
+                        ? compactDefaultHeight
+                        : Height;
+
+                MinWidth = compactMinWidth;
+                MinHeight = compactMinHeight;
+                Width = Math.Max(compactMinWidth, targetWidth);
+                Height = Math.Max(compactMinHeight, targetHeight);
+            }
+            else
+            {
+                var fullDefaultWidth = Math.Min(Math.Max(FullModeMinWidth, workArea.Width - 32), 1600);
+                var targetWidth = preferPersistedSize && _settings.FullModeWindowWidth > 0
+                    ? _settings.FullModeWindowWidth
+                    : isInitialLayout || Width < FullModeMinWidth
+                        ? fullDefaultWidth
+                        : Width;
+                var targetHeight = preferPersistedSize && _settings.FullModeWindowHeight > 0
+                    ? _settings.FullModeWindowHeight
+                    : isInitialLayout || Height < FullModeMinHeight
+                        ? FullModeDefaultHeight
+                        : Height;
+
+                MinWidth = FullModeMinWidth;
+                MinHeight = FullModeMinHeight;
+                Width = Math.Max(FullModeMinWidth, targetWidth);
+                Height = Math.Max(FullModeMinHeight, targetHeight);
+            }
+
+            Width = Math.Min(Width, workArea.Width - 16);
+            Height = Math.Min(Height, workArea.Height - 16);
+
+            if (isInitialLayout)
+            {
+                Left = workArea.Left + ((workArea.Width - Width) / 2);
+                Top = workArea.Top + 8;
+                return;
+            }
+
+            Left = Math.Max(workArea.Left + 8, Math.Min(Left, workArea.Right - Width - 8));
+            Top = Math.Max(workArea.Top + 8, Math.Min(Top, workArea.Bottom - Height - 8));
+        }
+        finally
+        {
+            _isApplyingWindowModeLayout = false;
+        }
     }
 
     private async void HotkeyService_HotkeyPressed(object? sender, EventArgs e)
@@ -125,6 +203,78 @@ public partial class MainWindow : Window
                 TryRegisterHotkey();
             }
         }
+
+        if (e.PropertyName == nameof(MainViewModel.IsCompactMode))
+        {
+            ApplyWindowModeLayout(isInitialLayout: false, preferPersistedSize: true);
+        }
+
+        if (e.PropertyName == nameof(MainViewModel.CompactModeScale) && _viewModel.IsCompactMode)
+        {
+            ApplyWindowModeLayout(isInitialLayout: false, preferPersistedSize: false);
+        }
+    }
+
+    private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (_isApplyingWindowModeLayout || WindowState != WindowState.Normal)
+        {
+            return;
+        }
+
+        var widthChanged = false;
+        var heightChanged = false;
+
+        if (_viewModel.IsCompactMode)
+        {
+            var compactMinWidth = GetCompactMinWidth();
+            var compactMinHeight = GetCompactMinHeight();
+            var nextWidth = Math.Max(compactMinWidth, Width);
+            var nextHeight = Math.Max(compactMinHeight, Height);
+            widthChanged = !AreClose(_settings.CompactModeWindowWidth, nextWidth);
+            heightChanged = !AreClose(_settings.CompactModeWindowHeight, nextHeight);
+            _settings.CompactModeWindowWidth = nextWidth;
+            _settings.CompactModeWindowHeight = nextHeight;
+        }
+        else
+        {
+            var nextWidth = Math.Max(FullModeMinWidth, Width);
+            var nextHeight = Math.Max(FullModeMinHeight, Height);
+            widthChanged = !AreClose(_settings.FullModeWindowWidth, nextWidth);
+            heightChanged = !AreClose(_settings.FullModeWindowHeight, nextHeight);
+            _settings.FullModeWindowWidth = nextWidth;
+            _settings.FullModeWindowHeight = nextHeight;
+        }
+
+        if (widthChanged || heightChanged)
+        {
+            _settingsService.Save(_settings);
+        }
+    }
+
+    private static bool AreClose(double left, double right)
+    {
+        return Math.Abs(left - right) < 0.5;
+    }
+
+    private double GetCompactDefaultWidth()
+    {
+        return Math.Max(CompactModeMinimumWidthFloor, Math.Ceiling((CompactModeBaseDefaultWidth * _viewModel.CompactModeScale) + CompactModeChromeWidth));
+    }
+
+    private double GetCompactDefaultHeight()
+    {
+        return Math.Max(CompactModeMinimumHeightFloor, Math.Ceiling((CompactModeBaseDefaultHeight * _viewModel.CompactModeScale) + CompactModeChromeHeight));
+    }
+
+    private double GetCompactMinWidth()
+    {
+        return Math.Max(CompactModeMinimumWidthFloor, Math.Ceiling((CompactModeBaseMinWidth * _viewModel.CompactModeScale) + CompactModeChromeWidth));
+    }
+
+    private double GetCompactMinHeight()
+    {
+        return Math.Max(CompactModeMinimumHeightFloor, Math.Ceiling((CompactModeBaseMinHeight * _viewModel.CompactModeScale) + CompactModeChromeHeight));
     }
 
     private void MainWindow_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
@@ -193,6 +343,17 @@ public partial class MainWindow : Window
     private void CloseButton_Click(object sender, RoutedEventArgs e)
     {
         Close();
+    }
+
+    private void OpenSettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        var settingsWindow = new SettingsWindow
+        {
+            Owner = this,
+            DataContext = _viewModel
+        };
+
+        settingsWindow.ShowDialog();
     }
 
     private void OfflineDropZone_DragOver(object sender, System.Windows.DragEventArgs e)

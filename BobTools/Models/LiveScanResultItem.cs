@@ -68,10 +68,60 @@ public sealed partial class LiveScanResultItem : ObservableObject
     [ObservableProperty] private List<string> selectedTargets = [];
     [ObservableProperty] private string autoSaveStatus = string.Empty;
 
+    public string CompactPrimaryValue => !string.IsNullOrWhiteSpace(CorrectValue)
+        ? CorrectValue
+        : !string.IsNullOrWhiteSpace(OcrText)
+            ? OcrText
+            : "Waiting for scan result";
+
+    public string CompactStatusSummary => IsTargetMatch && !string.IsNullOrWhiteSpace(TargetAlertSummary)
+        ? TargetAlertSummary
+        : ProcessingState;
+
+    public string CompactListSignature => !string.IsNullOrWhiteSpace(CorrectValue)
+        ? CorrectValue
+        : !string.IsNullOrWhiteSpace(OcrText)
+            ? OcrText
+            : "pending";
+
+    public string CompactListResource => !string.IsNullOrWhiteSpace(MatchedResourceName)
+        ? MatchedResourceName
+        : "resource pending";
+
+    public bool CompactListResourceIsHighlighted => IsTargetMatch;
+
+    public bool CompactListIsValid => !CompactListSignature.Contains('\n') && !CompactListSignature.Contains('\r');
+
+    public string CompactMetaSummary
+    {
+        get
+        {
+            var parts = new List<string>();
+
+            if (!string.IsNullOrWhiteSpace(SignatureResourceSummary))
+            {
+                parts.Add(SignatureResourceSummary.Replace("Signature resource: ", string.Empty, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(UsedOcrModeSummary))
+            {
+                parts.Add($"OCR {UsedOcrModeSummary}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(OcrSourceSummary))
+            {
+                parts.Add(OcrSourceSummary);
+            }
+
+            return parts.Count == 0 ? "Awaiting OCR details" : string.Join("  •  ", parts);
+        }
+    }
+
     public void SetProcessingState(string state, bool value)
     {
         ProcessingState = state;
         IsProcessing = value;
+        OnCompactDisplayChanged();
     }
 
     public void ApplyProcessedResult(
@@ -102,12 +152,14 @@ public sealed partial class LiveScanResultItem : ObservableObject
         _lastPersistedCorrectValue = CorrectValue ?? string.Empty;
         AutoSaveStatus = string.IsNullOrWhiteSpace(CorrectValue) ? string.Empty : "Saved";
         _suppressPersistence = false;
+        OnCompactDisplayChanged();
     }
 
     public void ApplyProcessingFailure(string processingState)
     {
         ProcessingState = processingState;
         IsProcessing = false;
+        OnCompactDisplayChanged();
     }
 
     public void ApplyTargetMatchState(bool isMatchingTarget)
@@ -122,15 +174,19 @@ public sealed partial class LiveScanResultItem : ObservableObject
     partial void OnMatchedResourceNameChanged(string? value)
     {
         OnPropertyChanged(nameof(TargetAlertSummary));
+        OnCompactDisplayChanged();
     }
 
     partial void OnIsTargetMatchChanged(bool value)
     {
         OnPropertyChanged(nameof(TargetAlertSummary));
+        OnCompactDisplayChanged();
     }
 
     async partial void OnCorrectValueChanged(string value)
     {
+        OnCompactDisplayChanged();
+
         if (_suppressPersistence)
         {
             return;
@@ -185,5 +241,15 @@ public sealed partial class LiveScanResultItem : ObservableObject
         bitmap.EndInit();
         bitmap.Freeze();
         return bitmap;
+    }
+    private void OnCompactDisplayChanged()
+    {
+        OnPropertyChanged(nameof(CompactPrimaryValue));
+        OnPropertyChanged(nameof(CompactStatusSummary));
+        OnPropertyChanged(nameof(CompactMetaSummary));
+        OnPropertyChanged(nameof(CompactListSignature));
+        OnPropertyChanged(nameof(CompactListResource));
+        OnPropertyChanged(nameof(CompactListResourceIsHighlighted));
+        OnPropertyChanged(nameof(CompactListIsValid));
     }
 }
