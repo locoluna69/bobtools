@@ -14,9 +14,11 @@ public sealed class SessionHistoryService : ISessionHistoryService
     };
 
     private readonly string _sessionId;
+    private readonly string _sessionsRootPath;
 
     public SessionHistoryService(string sessionsRootPath, string sessionId)
     {
+        _sessionsRootPath = sessionsRootPath;
         _sessionId = sessionId;
         SessionFilePath = Path.Combine(sessionsRootPath, sessionId, "session.json");
     }
@@ -28,6 +30,17 @@ public sealed class SessionHistoryService : ISessionHistoryService
         lock (_syncRoot)
         {
             var document = LoadDocument();
+            SaveDocument(document);
+        }
+    }
+
+    public void UpsertSessionMetadata(SessionMetadata metadata)
+    {
+        lock (_syncRoot)
+        {
+            var document = LoadDocument();
+            document.Metadata = metadata ?? new SessionMetadata();
+            document.LastUpdatedUtc = DateTime.UtcNow;
             SaveDocument(document);
         }
     }
@@ -52,30 +65,42 @@ public sealed class SessionHistoryService : ISessionHistoryService
         }
     }
 
+    public SessionHistoryDocument LoadCurrentDocument()
+    {
+        lock (_syncRoot)
+        {
+            return LoadDocument();
+        }
+    }
+
+    public IReadOnlyList<SessionHistoryDocument> LoadAllDocuments()
+    {
+        lock (_syncRoot)
+        {
+            if (!Directory.Exists(_sessionsRootPath))
+            {
+                return [];
+            }
+
+            return Directory.EnumerateFiles(_sessionsRootPath, "session.json", SearchOption.AllDirectories)
+                .Select(path => TryLoadDocumentFromPath(path))
+                .Where(document => document is not null)
+                .Select(document => document!)
+                .OrderByDescending(document => document.LastUpdatedUtc)
+                .ThenByDescending(document => document.CreatedUtc)
+                .ToList();
+        }
+    }
+
     private SessionHistoryDocument LoadDocument()
     {
-        if (!File.Exists(SessionFilePath))
-        {
-            return CreateDocument();
-        }
-
-        try
-        {
-            var json = File.ReadAllText(SessionFilePath);
-            var document = JsonSerializer.Deserialize<SessionHistoryDocument>(json, _jsonOptions) ?? CreateDocument();
-            document.SessionId = string.IsNullOrWhiteSpace(document.SessionId) ? _sessionId : document.SessionId;
-            document.Events ??= [];
-            return document;
-        }
-        catch (JsonException)
-        {
-            return CreateDocument();
-        }
+        return TryLoadDocumentFromPath(SessionFilePath, _sessionId) ?? CreateDocument();
     }
 
     private void SaveDocument(SessionHistoryDocument document)
     {
         document.SessionId = _sessionId;
+        document.Metadata ??= new SessionMetadata();
         document.Events ??= [];
 
         var directory = Path.GetDirectoryName(SessionFilePath)!;
@@ -95,7 +120,45 @@ public sealed class SessionHistoryService : ISessionHistoryService
             SessionId = _sessionId,
             CreatedUtc = now,
             LastUpdatedUtc = now,
+            Metadata = new SessionMetadata(),
             Events = []
         };
+    }
+
+    private SessionHistoryDocument? TryLoadDocumentFromPath(string sessionFilePath, string? fallbackSessionId = null)
+    {
+        if (!File.Exists(sessionFilePath))
+        {
+            return fallbackSessionId is null ? null : CreateDocument();
+        }
+
+        try
+        {
+            var json = File.ReadAllText(sessionFilePath);
+            var document = JsonSerializer.Deserialize<SessionHistoryDocument>(json, _jsonOptions);
+            if (document is null)
+            {
+                return fallbackSessionId is null ? null : CreateDocument();
+            }
+
+            document.SessionId = string.IsNullOrWhiteSpace(document.SessionId)
+                ? fallbackSessionId ?? Path.GetFileName(Path.GetDirectoryName(sessionFilePath) ?? string.Empty)
+                : document.SessionId;
+            document.Metadata ??= new SessionMetadata();
+            document.Events ??= [];
+            return document;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return null;
+        }
+        catch (JsonException)
+        {
+            return fallbackSessionId is null ? null : CreateDocument();
+        }
     }
 }

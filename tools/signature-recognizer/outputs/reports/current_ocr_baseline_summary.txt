@@ -1,0 +1,20 @@
+﻿BobTools current OCR baseline
+
+Total fixtures: 24
+Labeled fixtures: 13
+Exact labeled matches: 2
+Exact labeled accuracy: 15.38%
+Baseline errors: 0
+
+Mismatches:
+- scan_0002: expected '10,665', got '28' (binary-line)
+- scan_0004: expected '12,855', got '' (grayscale-line)
+- scan_0005: expected '16,720', got '218,720' (binary-line)
+- scan_0006: expected '16,900', got '1,602' (grayscale-line)
+- scan_0007: expected '16,900', got '' (grayscale-line)
+- scan_0008: expected '4,225', got '160' (binary-line)
+- scan_0009: expected '4,225', got '554,000' (binary-line)
+- scan_0010: expected '6,000', got '' (grayscale-line)
+- scan_0011: expected '6,000', got '1' (grayscale-line)
+- scan_0012: expected '7,110', got '' (grayscale-line)
+- scan_0013: expected '8,000', got '' (grayscale-line)

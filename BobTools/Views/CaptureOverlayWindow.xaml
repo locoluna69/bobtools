@@ -11,8 +11,8 @@
         Focusable="False">
     <Grid IsHitTestVisible="False">
         <Border BorderBrush="{StaticResource OverlayAccentBrushTheme}"
-                BorderThickness="3"
-                CornerRadius="4"
-                Background="#1A00B7FF" />
+                BorderThickness="1.5"
+                CornerRadius="3"
+                Background="#0D00B7FF" />
     </Grid>
 </Window>

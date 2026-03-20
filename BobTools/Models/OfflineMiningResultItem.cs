@@ -79,6 +79,130 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
     [ObservableProperty] private bool isProcessing;
     [ObservableProperty] private string usedOcrModeSummary = string.Empty;
     [ObservableProperty] private string ocrSourceSummary = string.Empty;
+    [ObservableProperty] private IReadOnlyList<string> selectedTargetResources = Array.Empty<string>();
+
+    public string CompactHeadline => !string.IsNullOrWhiteSpace(ExtractedScan.Material)
+        ? ExtractedScan.Material
+        : "Mining capture queued";
+
+    public bool CompactHeadlineIsHighlighted => SelectedTargetResources.Any(resource => string.Equals(resource, ExtractedScan.Material, StringComparison.OrdinalIgnoreCase));
+
+    public IReadOnlyList<CompactMiningOreItem> CompactOreItems
+    {
+        get
+        {
+            if (ExtractedScan.Elements.Count == 0)
+            {
+                return [];
+            }
+
+            var maxQuality = ExtractedScan.Elements
+                .Where(entry => entry.Quality is not null)
+                .Select(entry => entry.Quality)
+                .DefaultIfEmpty()
+                .Max();
+
+            return ExtractedScan.Elements
+                .Where(entry => !string.IsNullOrWhiteSpace(entry.Element))
+                .OrderByDescending(entry => entry.Quality ?? int.MinValue)
+                .ThenByDescending(entry => entry.Percentage ?? decimal.MinValue)
+                .Select(entry => new CompactMiningOreItem(
+                    BuildCompactOreText(entry),
+                    (maxQuality is not null && entry.Quality == maxQuality)
+                    || SelectedTargetResources.Any(resource => string.Equals(resource, entry.Element, StringComparison.OrdinalIgnoreCase))))
+                .ToArray();
+        }
+    }
+
+    public string CompactMetricsSummary
+    {
+        get
+        {
+            var parts = new List<string>();
+
+            if (ExtractedScan.Mass is not null)
+            {
+                parts.Add($"Mass {ExtractedScan.Mass:N0}");
+            }
+
+            if (ExtractedScan.Resistance is not null)
+            {
+                parts.Add($"Res {ExtractedScan.Resistance:0.##}%");
+            }
+
+            if (ExtractedScan.Instability is not null)
+            {
+                parts.Add($"Inst {ExtractedScan.Instability:0.##}");
+            }
+
+            if (ExtractedScan.Composition is not null)
+            {
+                parts.Add($"Comp {ExtractedScan.Composition:0.##}%");
+            }
+
+            return parts.Count == 0 ? "Metrics pending" : string.Join("  •  ", parts);
+        }
+    }
+
+    public string CompactOreSummary
+    {
+        get
+        {
+            var bestEntry = ExtractedScan.Elements
+                .OrderByDescending(entry => entry.Quality ?? int.MinValue)
+                .ThenByDescending(entry => entry.Percentage ?? decimal.MinValue)
+                .FirstOrDefault(entry => !string.IsNullOrWhiteSpace(entry.Element));
+
+            if (bestEntry is null)
+            {
+                return string.IsNullOrWhiteSpace(ExtractedScan.Location)
+                    ? "Composition pending"
+                    : $"Location: {ExtractedScan.Location}";
+            }
+
+            var qualitySuffix = bestEntry.Quality is null ? string.Empty : $" Q{bestEntry.Quality}";
+            var percentageSuffix = bestEntry.Percentage is null ? string.Empty : $"  •  {bestEntry.Percentage:0.##}%";
+            return $"Best ore: {bestEntry.Element}{qualitySuffix}{percentageSuffix}";
+        }
+    }
+
+    public string CompactStatusSummary
+    {
+        get
+        {
+            var parts = new List<string>();
+
+            if (!string.IsNullOrWhiteSpace(ProcessingState))
+            {
+                parts.Add(ProcessingState);
+            }
+
+            if (!string.IsNullOrWhiteSpace(UsedOcrModeSummary))
+            {
+                parts.Add($"OCR {UsedOcrModeSummary}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(OcrSourceSummary))
+            {
+                parts.Add(OcrSourceSummary);
+            }
+
+            return parts.Count == 0 ? "Awaiting mining result" : string.Join("  •  ", parts);
+        }
+    }
+
+    public bool HasCompactOreItems => CompactOreItems.Count > 0;
+
+    public void ApplySelectedTargetResources(IEnumerable<string>? resources)
+    {
+        SelectedTargetResources = resources?
+            .Where(resource => !string.IsNullOrWhiteSpace(resource))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray()
+            ?? Array.Empty<string>();
+
+        OnCompactDisplayChanged();
+    }
 
     public RockScan BuildUpdatedScan()
     {
@@ -110,12 +234,14 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
         Summary = Utils.RockScanParser.BuildSummary(savedScan);
         _savedSnapshot = BuildSnapshot();
         IsDirty = false;
+        OnCompactDisplayChanged();
     }
 
     public void SetProcessingState(string state, bool value)
     {
         ProcessingState = state;
         IsProcessing = value;
+        OnCompactDisplayChanged();
     }
 
     public void ApplyProcessedResult(RockScan processedScan, string processedSummary, string usedOcrModeSummary, string ocrSourceSummary, string? processedImageFilePath, string? savedJsonPath, string? savedCsvPath, string processingState)
@@ -133,12 +259,14 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
         IsProcessing = false;
         _savedSnapshot = BuildSnapshot();
         IsDirty = false;
+        OnCompactDisplayChanged();
     }
 
     public void ApplyProcessingFailure(string processingState)
     {
         ProcessingState = processingState;
         IsProcessing = false;
+        OnCompactDisplayChanged();
     }
 
     partial void OnEditableMaterialChanged(string value)
@@ -250,6 +378,7 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
 
         _suppressDirtyTracking = false;
         SubscribeToEditableElements(EditableElements);
+        OnCompactDisplayChanged();
     }
 
     private bool CanSave()
@@ -365,7 +494,37 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
         bitmap.Freeze();
         return bitmap;
     }
+
+    private void OnCompactDisplayChanged()
+    {
+        OnPropertyChanged(nameof(CompactHeadline));
+        OnPropertyChanged(nameof(CompactHeadlineIsHighlighted));
+        OnPropertyChanged(nameof(CompactMetricsSummary));
+        OnPropertyChanged(nameof(CompactOreSummary));
+        OnPropertyChanged(nameof(CompactStatusSummary));
+        OnPropertyChanged(nameof(CompactOreItems));
+        OnPropertyChanged(nameof(HasCompactOreItems));
+    }
+
+    private static string BuildCompactOreText(RockCompositionEntry entry)
+    {
+        var parts = new List<string> { entry.Element };
+
+        if (entry.Quality is not null)
+        {
+            parts.Add($"Q{entry.Quality}");
+        }
+
+        if (entry.Percentage is not null)
+        {
+            parts.Add($"{entry.Percentage:0.##}%");
+        }
+
+        return string.Join(" ", parts);
+    }
 }
+
+public sealed record CompactMiningOreItem(string DisplayText, bool IsHighlighted);
 
 public sealed partial class OfflineMiningElementEditRow : ObservableObject
 {

@@ -100,6 +100,200 @@
             </Setter>
         </Style>
 
+        <Style x:Key="CompactActionButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="72" />
+            <Setter Property="MinWidth" Value="112" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,10,10" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderThickness" Value="1.2" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+            <Setter Property="Background">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#133C63" Offset="0" />
+                        <GradientStop Color="#0D2E4E" Offset="0.52" />
+                        <GradientStop Color="#082038" Offset="1" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="BorderBrush" Value="#60A5FA" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Border x:Name="OuterBorder"
+                                    CornerRadius="16"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="18"
+                                                      ShadowDepth="0"
+                                                      Color="#66000000"
+                                                      Opacity="0.55" />
+                                </Border.Effect>
+                            </Border>
+
+                            <Border x:Name="InnerSheen"
+                                    Margin="1"
+                                    CornerRadius="15"
+                                    BorderBrush="#22FFFFFF"
+                                    BorderThickness="1"
+                                    Opacity="0.85">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="#26FFFFFF" Offset="0" />
+                                        <GradientStop Color="#00FFFFFF" Offset="0.45" />
+                                        <GradientStop Color="#10000000" Offset="1" />
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+
+                            <Border x:Name="HoverOverlay"
+                                    Margin="1"
+                                    CornerRadius="15"
+                                    Background="#30FFFFFF"
+                                    Opacity="0" />
+
+                            <ContentPresenter x:Name="ContentHost"
+                                              Margin="12,8"
+                                              HorizontalAlignment="Stretch"
+                                              VerticalAlignment="Stretch"
+                                              RenderTransformOrigin="0.5,0.5" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="HoverOverlay" Property="Opacity" Value="0.16" />
+                                <Setter TargetName="OuterBorder" Property="BorderThickness" Value="1.6" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="HoverOverlay" Property="Opacity" Value="0.24" />
+                                <Setter TargetName="ContentHost" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <ScaleTransform ScaleX="0.97" ScaleY="0.97" />
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter TargetName="OuterBorder" Property="Opacity" Value="0.96" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="OuterBorder" Property="Opacity" Value="0.42" />
+                                <Setter TargetName="InnerSheen" Property="Opacity" Value="0.2" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CompactSelectAreaButtonStyle" TargetType="Button" BasedOn="{StaticResource CompactActionButtonStyle}">
+            <Setter Property="Background">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#164E8A" Offset="0" />
+                        <GradientStop Color="#123E6F" Offset="0.52" />
+                        <GradientStop Color="#0B284A" Offset="1" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="BorderBrush" Value="#7DD3FC" />
+        </Style>
+
+        <Style x:Key="CompactCaptureButtonStyle" TargetType="Button" BasedOn="{StaticResource CompactActionButtonStyle}">
+            <Setter Property="Background">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#0E5C49" Offset="0" />
+                        <GradientStop Color="#0B483A" Offset="0.52" />
+                        <GradientStop Color="#073026" Offset="1" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="BorderBrush" Value="#6EE7B7" />
+        </Style>
+
+        <Style x:Key="CompactModeSwitchButtonStyle" TargetType="Button" BasedOn="{StaticResource CompactActionButtonStyle}">
+            <Setter Property="Background">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#7C3E0A" Offset="0" />
+                        <GradientStop Color="#5F2E08" Offset="0.52" />
+                        <GradientStop Color="#412006" Offset="1" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="BorderBrush" Value="#FBBF24" />
+        </Style>
+
+        <Style x:Key="CompactViewToggleButtonStyle" TargetType="Button" BasedOn="{StaticResource CompactActionButtonStyle}">
+            <Setter Property="Background">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#4338CA" Offset="0" />
+                        <GradientStop Color="#312E81" Offset="0.52" />
+                        <GradientStop Color="#1E1B4B" Offset="1" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="BorderBrush" Value="#A5B4FC" />
+        </Style>
+
+        <Style x:Key="CompactSettingsButtonStyle" TargetType="Button" BasedOn="{StaticResource CompactActionButtonStyle}">
+            <Setter Property="Background">
+                <Setter.Value>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#5B2447" Offset="0" />
+                        <GradientStop Color="#431B34" Offset="0.52" />
+                        <GradientStop Color="#2C1122" Offset="1" />
+                    </LinearGradientBrush>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="BorderBrush" Value="#F9A8D4" />
+        </Style>
+
+        <Style x:Key="OverlayToolbarButtonStyle" TargetType="Button" BasedOn="{StaticResource CompactActionButtonStyle}">
+            <Setter Property="Width" Value="92" />
+            <Setter Property="Height" Value="82" />
+            <Setter Property="MinWidth" Value="92" />
+            <Setter Property="Margin" Value="0,0,10,10" />
+        </Style>
+
+        <Style x:Key="FullSelectAreaButtonStyle" TargetType="Button" BasedOn="{StaticResource CompactSelectAreaButtonStyle}">
+            <Setter Property="Width" Value="92" />
+            <Setter Property="Height" Value="82" />
+            <Setter Property="MinWidth" Value="92" />
+            <Setter Property="Margin" Value="0,0,10,10" />
+        </Style>
+
+        <Style x:Key="FullCaptureButtonStyle" TargetType="Button" BasedOn="{StaticResource CompactCaptureButtonStyle}">
+            <Setter Property="Width" Value="92" />
+            <Setter Property="Height" Value="82" />
+            <Setter Property="MinWidth" Value="92" />
+            <Setter Property="Margin" Value="0,0,10,10" />
+        </Style>
+
+        <Style x:Key="FullModeActionButtonStyle" TargetType="Button" BasedOn="{StaticResource CompactModeSwitchButtonStyle}">
+            <Setter Property="Width" Value="92" />
+            <Setter Property="Height" Value="82" />
+            <Setter Property="MinWidth" Value="92" />
+            <Setter Property="Margin" Value="0,0,10,10" />
+        </Style>
+
+        <Style x:Key="FullViewToggleButtonStyle" TargetType="Button" BasedOn="{StaticResource CompactViewToggleButtonStyle}">
+            <Setter Property="Width" Value="92" />
+            <Setter Property="Height" Value="82" />
+            <Setter Property="MinWidth" Value="92" />
+            <Setter Property="Margin" Value="0,0,10,10" />
+        </Style>
+
+        <Style x:Key="FullSettingsButtonStyle" TargetType="Button" BasedOn="{StaticResource CompactSettingsButtonStyle}">
+            <Setter Property="Width" Value="92" />
+            <Setter Property="Height" Value="82" />
+            <Setter Property="MinWidth" Value="92" />
+            <Setter Property="Margin" Value="0,0,0,10" />
+        </Style>
+
         <Style TargetType="TextBox">
             <Setter Property="Background" Value="{StaticResource PanelBrush}" />
             <Setter Property="Foreground" Value="{StaticResource ForegroundBrushTheme}" />
@@ -194,6 +388,114 @@
                             </Trigger>
                             <Trigger SourceName="ToggleButton" Property="IsChecked" Value="True">
                                 <Setter TargetName="ComboBorder" Property="BorderBrush" Value="{StaticResource AccentBrushTheme}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ComboBorder" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SearchableComboBoxStyle" TargetType="ComboBox">
+            <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource ForegroundBrushTheme}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrushTheme}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="6,4" />
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <Border x:Name="ComboBorder"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="6">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="34" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <ContentPresenter x:Name="SelectionContent"
+                                                      Grid.Column="0"
+                                                      Margin="10,0,6,0"
+                                                      VerticalAlignment="Center"
+                                                      HorizontalAlignment="Left"
+                                                      Content="{TemplateBinding SelectionBoxItem}"
+                                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                      ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
+                                                      TextElement.Foreground="{TemplateBinding Foreground}"
+                                                      RecognizesAccessKey="True" />
+
+                                    <TextBox x:Name="PART_EditableTextBox"
+                                             Grid.Column="0"
+                                             Margin="8,2,4,2"
+                                             Background="Transparent"
+                                             BorderThickness="0"
+                                             Foreground="{TemplateBinding Foreground}"
+                                             CaretBrush="{TemplateBinding Foreground}"
+                                             Visibility="Collapsed"
+                                             Focusable="True"
+                                             IsReadOnly="{TemplateBinding IsReadOnly}" />
+
+                                    <ToggleButton x:Name="ToggleButton"
+                                                  Grid.Column="1"
+                                                  Focusable="False"
+                                                  ClickMode="Press"
+                                                  IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                                  Background="{StaticResource PanelAltBrush}"
+                                                  Foreground="{TemplateBinding Foreground}"
+                                                  BorderBrush="{StaticResource BorderBrushTheme}"
+                                                  BorderThickness="1,0,0,0">
+                                        <Path Width="10"
+                                              Height="6"
+                                              Stretch="Fill"
+                                              Fill="{StaticResource ForegroundBrushTheme}"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              Data="M 0 0 L 10 0 L 5 6 Z" />
+                                    </ToggleButton>
+                                </Grid>
+                            </Border>
+
+                            <Popup x:Name="PART_Popup"
+                                   Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   PopupAnimation="Slide">
+                                <Border Margin="0,4,0,0"
+                                        MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                        Background="{StaticResource PanelBrush}"
+                                        BorderBrush="{StaticResource BorderBrushTheme}"
+                                        BorderThickness="1"
+                                        CornerRadius="6">
+                                    <ScrollViewer MaxHeight="260"
+                                                  SnapsToDevicePixels="True">
+                                        <StackPanel IsItemsHost="True"
+                                                    KeyboardNavigation.DirectionalNavigation="Contained" />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ComboBorder" Property="BorderBrush" Value="{StaticResource AccentBrushTheme}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="ComboBorder" Property="BorderBrush" Value="{StaticResource AccentBrushTheme}" />
+                            </Trigger>
+                            <Trigger SourceName="ToggleButton" Property="IsChecked" Value="True">
+                                <Setter TargetName="ComboBorder" Property="BorderBrush" Value="{StaticResource AccentBrushTheme}" />
+                            </Trigger>
+                            <Trigger Property="IsEditable" Value="True">
+                                <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="SelectionContent" Property="Visibility" Value="Collapsed" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="ComboBorder" Property="Opacity" Value="0.45" />
