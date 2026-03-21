@@ -148,89 +148,159 @@ def import_archive(
 
     with ZipFile(archive_path) as archive:
         members = archive.namelist()
-        csv_candidates = [member for member in members if member.endswith("scan_training_labels.csv")]
-        if not csv_candidates:
-            summary.append("  - skipped: missing scan_training_labels.csv")
+        legacy_csv_member = find_member_by_suffix(members, "scan_training_labels.csv")
+        batch_manifest_member = find_member_by_suffix(members, "manifest.csv")
+
+        if legacy_csv_member:
+            summary.append("  - layout: legacy-session")
+            rows.extend(
+                import_legacy_session_rows(
+                    archive=archive,
+                    archive_path=archive_path,
+                    csv_member=legacy_csv_member,
+                    imports_root=imports_root,
+                    default_split=default_split,
+                    copy_mode=copy_mode,
+                    seen_keys=seen_keys,
+                )
+            )
+        elif batch_manifest_member:
+            summary.append("  - layout: batch-manifest")
+            rows.extend(
+                import_batch_manifest_rows(
+                    archive=archive,
+                    archive_path=archive_path,
+                    manifest_member=batch_manifest_member,
+                    imports_root=imports_root,
+                    default_split=default_split,
+                    copy_mode=copy_mode,
+                    seen_keys=seen_keys,
+                )
+            )
+        else:
+            summary.append("  - skipped: missing manifest.csv or scan_training_labels.csv")
             return rows, summary
-
-        csv_member = csv_candidates[0]
-        session_root = PurePosixPath(csv_member).parent
-        session_id = session_root.name or archive_path.stem
-        session_context = read_session_context(archive, session_root)
-
-        with archive.open(csv_member, "r") as stream:
-            decoded_lines = (line.decode("utf-8-sig") for line in stream)
-            reader = csv.DictReader(decoded_lines)
-            for index, source_row in enumerate(reader, start=1):
-                entry_id = clean_text(source_row.get("entry_id")) or f"{session_id}-{index:04d}"
-                dedupe_key = (session_id, entry_id)
-                if dedupe_key in seen_keys:
-                    rows.append(build_duplicate_row(session_id, entry_id, archive_path.name))
-                    continue
-
-                seen_keys.add(dedupe_key)
-
-                source_relative = clean_text(source_row.get("source_image_relative_path"))
-                processed_relative = clean_text(source_row.get("processed_image_relative_path"))
-                imported_source = extract_member(
-                    archive,
-                    session_root,
-                    source_relative,
-                    imports_root / session_id,
-                    copy_mode,
-                )
-                imported_processed = extract_member(
-                    archive,
-                    session_root,
-                    processed_relative,
-                    imports_root / session_id,
-                    copy_mode,
-                )
-
-                preferred_image = imported_processed or imported_source
-                detected_value = clean_text(source_row.get("detected_value"))
-                correct_value = clean_text(source_row.get("correct_value"))
-                processing_state = clean_text(source_row.get("processing_state"))
-                usable = bool(preferred_image and correct_value and processing_state.lower() == "processed")
-
-                rows.append(
-                    {
-                        "id": f"bobtools_{session_id}_{index:04d}",
-                        "session_id": session_id,
-                        "entry_id": entry_id,
-                        "archive_name": archive_path.name,
-                        "timestamp_utc": clean_text(source_row.get("timestamp_utc")),
-                        "capture_profile": clean_text(source_row.get("capture_profile")) or "signature",
-                        "source_image_path": to_workspace_relative(imported_source, imports_root.parent.parent),
-                        "processed_image_path": to_workspace_relative(imported_processed, imports_root.parent.parent),
-                        "preferred_image_path": to_workspace_relative(preferred_image, imports_root.parent.parent),
-                        "detected_value": detected_value,
-                        "correct_value": correct_value,
-                        "expected_text": correct_value,
-                        "signature_summary": clean_text(source_row.get("signature_summary")),
-                        "matched_resource": clean_text(source_row.get("matched_resource")),
-                        "is_target_match": normalize_bool(source_row.get("is_target_match")),
-                        "ocr_mode": clean_text(source_row.get("ocr_mode")),
-                        "ocr_source": clean_text(source_row.get("ocr_source")),
-                        "processing_state": processing_state,
-                        "selected_targets": clean_text(source_row.get("selected_targets")),
-                        "label_source": "bobtools-user-export",
-                        "split": default_split if usable else "unassigned",
-                        "use_for_training": "true" if usable else "false",
-                        "rsi_handle": session_context.rsi_handle,
-                        "ship": session_context.ship,
-                        "star_system": session_context.star_system,
-                        "location_path": session_context.location_path,
-                        "status": "imported",
-                        "notes": build_notes(detected_value, correct_value, preferred_image is not None, processing_state),
-                    }
-                )
 
     imported_rows = sum(1 for row in rows if row["status"] == "imported")
     approved_rows = sum(1 for row in rows if row["use_for_training"] == "true")
     summary.append(f"  - imported rows: {imported_rows}")
     summary.append(f"  - approved rows: {approved_rows}")
     return rows, summary
+
+
+def import_legacy_session_rows(
+    archive: ZipFile,
+    archive_path: Path,
+    csv_member: str,
+    imports_root: Path,
+    default_split: str,
+    copy_mode: str,
+    seen_keys: set[tuple[str, str]],
+) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    session_root = PurePosixPath(csv_member).parent
+    session_id = session_root.name or archive_path.stem
+    session_context = read_session_context(archive, session_root)
+
+    for index, source_row in enumerate(read_csv_rows(archive, csv_member), start=1):
+        entry_id = clean_text(source_row.get("entry_id")) or f"{session_id}-{index:04d}"
+        dedupe_key = (session_id, entry_id)
+        if dedupe_key in seen_keys:
+            rows.append(build_duplicate_row(session_id, entry_id, archive_path.name))
+            continue
+
+        seen_keys.add(dedupe_key)
+
+        source_relative = clean_text(source_row.get("source_image_relative_path"))
+        processed_relative = clean_text(source_row.get("processed_image_relative_path"))
+        imported_source = extract_member(
+            archive,
+            session_root,
+            source_relative,
+            imports_root / session_id,
+            copy_mode,
+        )
+        imported_processed = extract_member(
+            archive,
+            session_root,
+            processed_relative,
+            imports_root / session_id,
+            copy_mode,
+        )
+
+        rows.append(
+            build_import_row(
+                session_id=session_id,
+                entry_id=entry_id,
+                archive_name=archive_path.name,
+                row_number=index,
+                source_row=source_row,
+                imported_source=imported_source,
+                imported_processed=imported_processed,
+                default_split=default_split,
+                session_context=session_context,
+                workspace_root=imports_root.parent.parent,
+            )
+        )
+
+    return rows
+
+
+def import_batch_manifest_rows(
+    archive: ZipFile,
+    archive_path: Path,
+    manifest_member: str,
+    imports_root: Path,
+    default_split: str,
+    copy_mode: str,
+    seen_keys: set[tuple[str, str]],
+) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    manifest_root = PurePosixPath(manifest_member).parent
+
+    for index, source_row in enumerate(read_csv_rows(archive, manifest_member), start=1):
+        session_id = clean_text(source_row.get("session_id")) or archive_path.stem
+        entry_id = clean_text(source_row.get("entry_id")) or f"{session_id}-{index:04d}"
+        dedupe_key = (session_id, entry_id)
+        if dedupe_key in seen_keys:
+            rows.append(build_duplicate_row(session_id, entry_id, archive_path.name))
+            continue
+
+        seen_keys.add(dedupe_key)
+
+        source_relative = clean_text(source_row.get("source_image_relative_path"))
+        processed_relative = clean_text(source_row.get("processed_image_relative_path"))
+        imported_source = extract_member(
+            archive,
+            manifest_root,
+            source_relative,
+            imports_root / session_id,
+            copy_mode,
+        )
+        imported_processed = extract_member(
+            archive,
+            manifest_root,
+            processed_relative,
+            imports_root / session_id,
+            copy_mode,
+        )
+
+        rows.append(
+            build_import_row(
+                session_id=session_id,
+                entry_id=entry_id,
+                archive_name=archive_path.name,
+                row_number=index,
+                source_row=source_row,
+                imported_source=imported_source,
+                imported_processed=imported_processed,
+                default_split=default_split,
+                session_context=SessionContext(),
+                workspace_root=imports_root.parent.parent,
+            )
+        )
+
+    return rows
 
 
 def read_session_context(archive: ZipFile, session_root: PurePosixPath) -> SessionContext:
@@ -248,6 +318,20 @@ def read_session_context(archive: ZipFile, session_root: PurePosixPath) -> Sessi
         star_system=clean_text(metadata.get("starSystem")),
         location_path=clean_text(metadata.get("locationPath")),
     )
+
+
+def read_csv_rows(archive: ZipFile, member_name: str) -> csv.DictReader:
+    with archive.open(member_name, "r") as stream:
+        decoded_lines = (line.decode("utf-8-sig") for line in stream)
+        yield from csv.DictReader(decoded_lines)
+
+
+def find_member_by_suffix(members: Iterable[str], suffix: str) -> str | None:
+    normalized_suffix = suffix.lower()
+    candidates = [member for member in members if member.lower().endswith(normalized_suffix)]
+    if not candidates:
+        return None
+    return sorted(candidates, key=lambda member: (member.count("/"), len(member), member))[0]
 
 
 def extract_member(
@@ -308,6 +392,56 @@ def build_duplicate_row(session_id: str, entry_id: str, archive_name: str) -> di
         "location_path": "",
         "status": "duplicate-skipped",
         "notes": "Duplicate session_id + entry_id detected in this import run.",
+    }
+
+
+def build_import_row(
+    session_id: str,
+    entry_id: str,
+    archive_name: str,
+    row_number: int,
+    source_row: dict[str, str],
+    imported_source: Path | None,
+    imported_processed: Path | None,
+    default_split: str,
+    session_context: SessionContext,
+    workspace_root: Path,
+) -> dict[str, str]:
+    preferred_image = imported_processed or imported_source
+    detected_value = clean_text(source_row.get("detected_value"))
+    correct_value = clean_text(source_row.get("correct_value"))
+    processing_state = clean_text(source_row.get("processing_state"))
+    usable = bool(preferred_image and correct_value and processing_state.lower() == "processed")
+
+    return {
+        "id": f"bobtools_{session_id}_{row_number:04d}",
+        "session_id": session_id,
+        "entry_id": entry_id,
+        "archive_name": archive_name,
+        "timestamp_utc": clean_text(source_row.get("timestamp_utc")),
+        "capture_profile": clean_text(source_row.get("capture_profile")) or "signature",
+        "source_image_path": to_workspace_relative(imported_source, workspace_root),
+        "processed_image_path": to_workspace_relative(imported_processed, workspace_root),
+        "preferred_image_path": to_workspace_relative(preferred_image, workspace_root),
+        "detected_value": detected_value,
+        "correct_value": correct_value,
+        "expected_text": correct_value,
+        "signature_summary": clean_text(source_row.get("signature_summary")),
+        "matched_resource": clean_text(source_row.get("matched_resource")),
+        "is_target_match": normalize_bool(source_row.get("is_target_match")),
+        "ocr_mode": clean_text(source_row.get("ocr_mode")),
+        "ocr_source": clean_text(source_row.get("ocr_source")),
+        "processing_state": processing_state,
+        "selected_targets": clean_text(source_row.get("selected_targets")),
+        "label_source": "bobtools-user-export",
+        "split": default_split if usable else "unassigned",
+        "use_for_training": "true" if usable else "false",
+        "rsi_handle": session_context.rsi_handle,
+        "ship": session_context.ship,
+        "star_system": session_context.star_system,
+        "location_path": session_context.location_path,
+        "status": "imported",
+        "notes": build_notes(detected_value, correct_value, preferred_image is not None, processing_state),
     }
 
 
