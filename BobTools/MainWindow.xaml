@@ -586,14 +586,64 @@
                                                    Foreground="#94A3B8"
                                                    FontWeight="SemiBold"
                                                    Text="Review filter" />
-                                        <ComboBox DockPanel.Dock="Right"
-                                                  Width="150"
-                                                  Margin="12,0,0,0"
-                                                  ItemsSource="{Binding LiveScanReviewFilterOptions}"
-                                                  SelectedItem="{Binding SelectedLiveScanReviewFilter, UpdateSourceTrigger=PropertyChanged}"
-                                                  Background="#0F172A"
-                                                  Foreground="#E5E7EB"
-                                                  BorderBrush="#334155" />
+                                        <StackPanel DockPanel.Dock="Right"
+                                                    Margin="12,0,0,0">
+                                            <ToggleButton x:Name="LiveScanReviewFilterButton"
+                                                          Width="220"
+                                                          Height="30"
+                                                          HorizontalAlignment="Right"
+                                                          Padding="10,6"
+                                                          Background="#0F172A"
+                                                          BorderBrush="#334155"
+                                                          Foreground="#E5E7EB"
+                                                          IsChecked="{Binding IsLiveScanReviewFilterSelectorOpen, Mode=TwoWay}"
+                                                          Content="{Binding SelectedLiveScanReviewFilterSummary}" />
+                                            <Popup PlacementTarget="{Binding ElementName=LiveScanReviewFilterButton}"
+                                                   Placement="Bottom"
+                                                   StaysOpen="False"
+                                                   IsOpen="{Binding IsLiveScanReviewFilterSelectorOpen, Mode=TwoWay}">
+                                                <Border Margin="0,6,0,0"
+                                                        Padding="12"
+                                                        Width="240"
+                                                        MaxHeight="260"
+                                                        CornerRadius="10"
+                                                        Background="#E6111827"
+                                                        BorderBrush="#38BDF8"
+                                                        BorderThickness="1">
+                                                    <Grid>
+                                                        <Grid.RowDefinitions>
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="*" />
+                                                        </Grid.RowDefinitions>
+                                                        <TextBlock Foreground="White"
+                                                                   FontWeight="SemiBold"
+                                                                   Text="Show scan results with review state" />
+                                                        <WrapPanel Grid.Row="1" Margin="0,8,0,8">
+                                                            <Button Width="80"
+                                                                    Margin="0,0,8,0"
+                                                                    Content="Select All"
+                                                                    Command="{Binding SelectAllLiveScanReviewFiltersCommand}" />
+                                                            <Button Width="80"
+                                                                    Content="Clear"
+                                                                    Command="{Binding ClearLiveScanReviewFiltersCommand}" />
+                                                        </WrapPanel>
+                                                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                                                            <ItemsControl ItemsSource="{Binding LiveScanReviewFilterOptions}">
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate>
+                                                                        <CheckBox Margin="0,0,0,6"
+                                                                                  Foreground="#E5E7EB"
+                                                                                  Content="{Binding DisplayName}"
+                                                                                  IsChecked="{Binding IsSelected, Mode=TwoWay}" />
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+                                                        </ScrollViewer>
+                                                    </Grid>
+                                                </Border>
+                                            </Popup>
+                                        </StackPanel>
                                     </DockPanel>
                                         <ItemsControl ItemsSource="{Binding LiveScanResultsView}">
                                         <ItemsControl.ItemTemplate>
@@ -747,14 +797,64 @@
                                                    Foreground="#94A3B8"
                                                    FontWeight="SemiBold"
                                                    Text="Review filter" />
-                                        <ComboBox DockPanel.Dock="Right"
-                                                  Width="150"
-                                                  Margin="12,0,0,0"
-                                                  ItemsSource="{Binding LiveMiningReviewFilterOptions}"
-                                                  SelectedItem="{Binding SelectedLiveMiningReviewFilter, UpdateSourceTrigger=PropertyChanged}"
-                                                  Background="#0F172A"
-                                                  Foreground="#E5E7EB"
-                                                  BorderBrush="#334155" />
+                                        <StackPanel DockPanel.Dock="Right"
+                                                    Margin="12,0,0,0">
+                                            <ToggleButton x:Name="LiveMiningReviewFilterButton"
+                                                          Width="220"
+                                                          Height="30"
+                                                          HorizontalAlignment="Right"
+                                                          Padding="10,6"
+                                                          Background="#0F172A"
+                                                          BorderBrush="#334155"
+                                                          Foreground="#E5E7EB"
+                                                          IsChecked="{Binding IsLiveMiningReviewFilterSelectorOpen, Mode=TwoWay}"
+                                                          Content="{Binding SelectedLiveMiningReviewFilterSummary}" />
+                                            <Popup PlacementTarget="{Binding ElementName=LiveMiningReviewFilterButton}"
+                                                   Placement="Bottom"
+                                                   StaysOpen="False"
+                                                   IsOpen="{Binding IsLiveMiningReviewFilterSelectorOpen, Mode=TwoWay}">
+                                                <Border Margin="0,6,0,0"
+                                                        Padding="12"
+                                                        Width="240"
+                                                        MaxHeight="240"
+                                                        CornerRadius="10"
+                                                        Background="#E6111827"
+                                                        BorderBrush="#2DD4BF"
+                                                        BorderThickness="1">
+                                                    <Grid>
+                                                        <Grid.RowDefinitions>
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="*" />
+                                                        </Grid.RowDefinitions>
+                                                        <TextBlock Foreground="White"
+                                                                   FontWeight="SemiBold"
+                                                                   Text="Show mining results with review state" />
+                                                        <WrapPanel Grid.Row="1" Margin="0,8,0,8">
+                                                            <Button Width="80"
+                                                                    Margin="0,0,8,0"
+                                                                    Content="Select All"
+                                                                    Command="{Binding SelectAllLiveMiningReviewFiltersCommand}" />
+                                                            <Button Width="80"
+                                                                    Content="Clear"
+                                                                    Command="{Binding ClearLiveMiningReviewFiltersCommand}" />
+                                                        </WrapPanel>
+                                                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                                                            <ItemsControl ItemsSource="{Binding LiveMiningReviewFilterOptions}">
+                                                                <ItemsControl.ItemTemplate>
+                                                                    <DataTemplate>
+                                                                        <CheckBox Margin="0,0,0,6"
+                                                                                  Foreground="#E5E7EB"
+                                                                                  Content="{Binding DisplayName}"
+                                                                                  IsChecked="{Binding IsSelected, Mode=TwoWay}" />
+                                                                    </DataTemplate>
+                                                                </ItemsControl.ItemTemplate>
+                                                            </ItemsControl>
+                                                        </ScrollViewer>
+                                                    </Grid>
+                                                </Border>
+                                            </Popup>
+                                        </StackPanel>
                                     </DockPanel>
                                     <ItemsControl ItemsSource="{Binding LiveMiningResultsView}">
                                     <ItemsControl.ItemTemplate>

@@ -44,9 +44,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly List<string> _offlineScanInputImagePaths = [];
     private readonly List<string> _offlineMiningInputImagePaths = [];
     private bool _isUpdatingScanTargetSelection;
+    private bool _isUpdatingLiveScanReviewFilterSelection;
+    private bool _isUpdatingLiveMiningReviewFilterSelection;
     private bool _isSyncingOfflineScanSelection;
     private CancellationTokenSource? _sessionProfileImageCancellation;
     private int _sessionProfileImageRequestVersion;
+    private const string ExportedReviewFilterKey = "Exported";
 
     [ObservableProperty] private string status = "Ready.";
     [ObservableProperty] private string acceptedText = string.Empty;
@@ -103,8 +106,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private int selectedMainTabIndex;
     [ObservableProperty] private bool isScanTargetSelectorOpen;
     [ObservableProperty] private string selectedScanTargetsSummary = "Highlight targets: none";
-    [ObservableProperty] private string selectedLiveScanReviewFilter = "All";
-    [ObservableProperty] private string selectedLiveMiningReviewFilter = "All";
+    [ObservableProperty] private bool isLiveScanReviewFilterSelectorOpen;
+    [ObservableProperty] private bool isLiveMiningReviewFilterSelectorOpen;
+    [ObservableProperty] private string selectedLiveScanReviewFilterSummary = "Review filter: all";
+    [ObservableProperty] private string selectedLiveMiningReviewFilterSummary = "Review filter: all";
     [ObservableProperty] private string scanTrainingDatasetSummary = "Scan dataset: 0 total | 0 pending | 0 reviewed | 0 exported | 0 rejected";
     [ObservableProperty] private string miningReviewDatasetSummary = "Mining dataset: 0 total | 0 pending | 0 reviewed | 0 rejected";
     [ObservableProperty] private double offlinePreviewWidth = 640;
@@ -147,6 +152,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public IRelayCommand<OfflineMiningElementEditRow> DeleteOfflineMiningRowCommand { get; }
     public IRelayCommand SelectAllScanTargetsCommand { get; }
     public IRelayCommand ClearScanTargetsCommand { get; }
+    public IRelayCommand SelectAllLiveScanReviewFiltersCommand { get; }
+    public IRelayCommand ClearLiveScanReviewFiltersCommand { get; }
+    public IRelayCommand SelectAllLiveMiningReviewFiltersCommand { get; }
+    public IRelayCommand ClearLiveMiningReviewFiltersCommand { get; }
     public IReadOnlyList<OcrModeOption> OcrModeOptions { get; } = OcrModeCatalog.Options;
     public IReadOnlyList<CaptureProfileOption> WorkflowModeOptions { get; } = WorkflowModeCatalog.Options;
     public IReadOnlyList<CaptureProfileOption> CaptureProfileOptions { get; } = CaptureProfileCatalog.Options;
@@ -161,10 +170,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public ObservableCollection<MiningLocationOption> SessionLocationOptions { get; } = new();
     public ObservableCollection<LiveScanResultItem> LiveScanResults { get; } = new();
     public ObservableCollection<OfflineMiningResultItem> LiveMiningResults { get; } = new();
+    public ObservableCollection<ReviewFilterOption> LiveScanReviewFilterOptions { get; } = new();
+    public ObservableCollection<ReviewFilterOption> LiveMiningReviewFilterOptions { get; } = new();
     public ICollectionView LiveScanResultsView => _liveScanResultsView;
     public ICollectionView LiveMiningResultsView => _liveMiningResultsView;
-    public IReadOnlyList<string> LiveScanReviewFilterOptions { get; } = ["All", ScanReviewCatalog.Pending, ScanReviewCatalog.Reviewed, ScanReviewCatalog.Rejected, "Exported"];
-    public IReadOnlyList<string> LiveMiningReviewFilterOptions { get; } = ["All", ScanReviewCatalog.Pending, ScanReviewCatalog.Reviewed, ScanReviewCatalog.Rejected];
 
     public bool IsOfflineMiningSelected => string.Equals(OfflineSelectedCaptureProfile, CaptureProfileCatalog.Mining, StringComparison.OrdinalIgnoreCase);
     public bool IsScanningMode => string.Equals(SelectedWorkflowMode, WorkflowModeCatalog.Scanning, StringComparison.OrdinalIgnoreCase);
@@ -265,6 +274,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _liveScanResultsView.Filter = ShouldIncludeLiveScanResult;
         _liveMiningResultsView = CollectionViewSource.GetDefaultView(LiveMiningResults);
         _liveMiningResultsView.Filter = ShouldIncludeLiveMiningResult;
+        LoadReviewFilterOptions();
         LiveScanResults.CollectionChanged += LiveScanResults_CollectionChanged;
         LiveMiningResults.CollectionChanged += LiveMiningResults_CollectionChanged;
         LoadScanTargetOptions();
@@ -305,18 +315,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
         DeleteOfflineMiningRowCommand = new RelayCommand<OfflineMiningElementEditRow>(DeleteOfflineMiningRow);
         SelectAllScanTargetsCommand = new RelayCommand(() => SetAllScanTargets(true));
         ClearScanTargetsCommand = new RelayCommand(() => SetAllScanTargets(false));
+        SelectAllLiveScanReviewFiltersCommand = new RelayCommand(() => SetAllLiveScanReviewFilters(true));
+        ClearLiveScanReviewFiltersCommand = new RelayCommand(() => SetAllLiveScanReviewFilters(false));
+        SelectAllLiveMiningReviewFiltersCommand = new RelayCommand(() => SetAllLiveMiningReviewFilters(true));
+        ClearLiveMiningReviewFiltersCommand = new RelayCommand(() => SetAllLiveMiningReviewFilters(false));
         UpdateScanTrainingDatasetSummary();
         UpdateMiningReviewDatasetSummary();
-    }
-
-    partial void OnSelectedLiveScanReviewFilterChanged(string value)
-    {
-        _liveScanResultsView.Refresh();
-    }
-
-    partial void OnSelectedLiveMiningReviewFilterChanged(string value)
-    {
-        _liveMiningResultsView.Refresh();
     }
 
     partial void OnIsCompactModeChanged(bool value)
@@ -344,15 +348,37 @@ public partial class MainViewModel : ObservableObject, IDisposable
             return false;
         }
 
-        return SelectedLiveScanReviewFilter switch
+        var selectedFilters = GetSelectedReviewFilters(LiveScanReviewFilterOptions);
+        if (selectedFilters.Count == 0)
         {
-            ScanReviewCatalog.Pending => string.Equals(resultItem.ReviewStatus, ScanReviewCatalog.Pending, StringComparison.Ordinal),
-            ScanReviewCatalog.Reviewed => string.Equals(resultItem.ReviewStatus, ScanReviewCatalog.Reviewed, StringComparison.Ordinal)
-                && resultItem.ExportedAtUtc is null,
-            ScanReviewCatalog.Rejected => string.Equals(resultItem.ReviewStatus, ScanReviewCatalog.Rejected, StringComparison.Ordinal),
-            "Exported" => resultItem.ExportedAtUtc is not null,
-            _ => true
-        };
+            return false;
+        }
+
+        if (selectedFilters.Contains(ExportedReviewFilterKey) && resultItem.ExportedAtUtc is not null)
+        {
+            return true;
+        }
+
+        if (selectedFilters.Contains(ScanReviewCatalog.Pending)
+            && string.Equals(resultItem.ReviewStatus, ScanReviewCatalog.Pending, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (selectedFilters.Contains(ScanReviewCatalog.Reviewed)
+            && string.Equals(resultItem.ReviewStatus, ScanReviewCatalog.Reviewed, StringComparison.Ordinal)
+            && resultItem.ExportedAtUtc is null)
+        {
+            return true;
+        }
+
+        if (selectedFilters.Contains(ScanReviewCatalog.Rejected)
+            && string.Equals(resultItem.ReviewStatus, ScanReviewCatalog.Rejected, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     private bool ShouldIncludeLiveMiningResult(object item)
@@ -362,13 +388,18 @@ public partial class MainViewModel : ObservableObject, IDisposable
             return false;
         }
 
-        return SelectedLiveMiningReviewFilter switch
+        var selectedFilters = GetSelectedReviewFilters(LiveMiningReviewFilterOptions);
+        if (selectedFilters.Count == 0)
         {
-            ScanReviewCatalog.Pending => string.Equals(resultItem.ReviewStatus, ScanReviewCatalog.Pending, StringComparison.Ordinal),
-            ScanReviewCatalog.Reviewed => string.Equals(resultItem.ReviewStatus, ScanReviewCatalog.Reviewed, StringComparison.Ordinal),
-            ScanReviewCatalog.Rejected => string.Equals(resultItem.ReviewStatus, ScanReviewCatalog.Rejected, StringComparison.Ordinal),
-            _ => true
-        };
+            return false;
+        }
+
+        return (selectedFilters.Contains(ScanReviewCatalog.Pending)
+                && string.Equals(resultItem.ReviewStatus, ScanReviewCatalog.Pending, StringComparison.Ordinal))
+            || (selectedFilters.Contains(ScanReviewCatalog.Reviewed)
+                && string.Equals(resultItem.ReviewStatus, ScanReviewCatalog.Reviewed, StringComparison.Ordinal))
+            || (selectedFilters.Contains(ScanReviewCatalog.Rejected)
+                && string.Equals(resultItem.ReviewStatus, ScanReviewCatalog.Rejected, StringComparison.Ordinal));
     }
 
     private void LiveScanResults_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -904,6 +935,147 @@ public partial class MainViewModel : ObservableObject, IDisposable
         UpdateSelectedScanTargetsSummary();
         UpdateLiveScanTargetHighlights();
         UpdateLiveMiningTargetHighlights();
+    }
+
+    private void LoadReviewFilterOptions()
+    {
+        InitializeReviewFilterOptions(
+            LiveScanReviewFilterOptions,
+            [
+                (ScanReviewCatalog.Pending, ScanReviewCatalog.Pending),
+                (ScanReviewCatalog.Reviewed, ScanReviewCatalog.Reviewed),
+                (ScanReviewCatalog.Rejected, ScanReviewCatalog.Rejected),
+                (ExportedReviewFilterKey, ExportedReviewFilterKey)
+            ],
+            LiveScanReviewFilterOption_PropertyChanged);
+
+        InitializeReviewFilterOptions(
+            LiveMiningReviewFilterOptions,
+            [
+                (ScanReviewCatalog.Pending, ScanReviewCatalog.Pending),
+                (ScanReviewCatalog.Reviewed, ScanReviewCatalog.Reviewed),
+                (ScanReviewCatalog.Rejected, ScanReviewCatalog.Rejected)
+            ],
+            LiveMiningReviewFilterOption_PropertyChanged);
+
+        UpdateSelectedLiveScanReviewFilterSummary();
+        UpdateSelectedLiveMiningReviewFilterSummary();
+        _liveScanResultsView.Refresh();
+        _liveMiningResultsView.Refresh();
+    }
+
+    private static void InitializeReviewFilterOptions(
+        ObservableCollection<ReviewFilterOption> options,
+        IReadOnlyList<(string Key, string DisplayName)> definitions,
+        PropertyChangedEventHandler propertyChangedHandler)
+    {
+        options.Clear();
+        foreach (var (key, displayName) in definitions)
+        {
+            var option = new ReviewFilterOption(key, displayName);
+            option.PropertyChanged += propertyChangedHandler;
+            options.Add(option);
+        }
+    }
+
+    private void LiveScanReviewFilterOption_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (_isUpdatingLiveScanReviewFilterSelection || !string.Equals(e.PropertyName, nameof(ReviewFilterOption.IsSelected), StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        UpdateSelectedLiveScanReviewFilterSummary();
+        _liveScanResultsView.Refresh();
+    }
+
+    private void LiveMiningReviewFilterOption_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (_isUpdatingLiveMiningReviewFilterSelection || !string.Equals(e.PropertyName, nameof(ReviewFilterOption.IsSelected), StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        UpdateSelectedLiveMiningReviewFilterSummary();
+        _liveMiningResultsView.Refresh();
+    }
+
+    private void SetAllLiveScanReviewFilters(bool isSelected)
+    {
+        _isUpdatingLiveScanReviewFilterSelection = true;
+        try
+        {
+            foreach (var option in LiveScanReviewFilterOptions)
+            {
+                option.IsSelected = isSelected;
+            }
+        }
+        finally
+        {
+            _isUpdatingLiveScanReviewFilterSelection = false;
+        }
+
+        UpdateSelectedLiveScanReviewFilterSummary();
+        _liveScanResultsView.Refresh();
+    }
+
+    private void SetAllLiveMiningReviewFilters(bool isSelected)
+    {
+        _isUpdatingLiveMiningReviewFilterSelection = true;
+        try
+        {
+            foreach (var option in LiveMiningReviewFilterOptions)
+            {
+                option.IsSelected = isSelected;
+            }
+        }
+        finally
+        {
+            _isUpdatingLiveMiningReviewFilterSelection = false;
+        }
+
+        UpdateSelectedLiveMiningReviewFilterSummary();
+        _liveMiningResultsView.Refresh();
+    }
+
+    private void UpdateSelectedLiveScanReviewFilterSummary()
+    {
+        SelectedLiveScanReviewFilterSummary = BuildReviewFilterSummary("Review filter", LiveScanReviewFilterOptions);
+    }
+
+    private void UpdateSelectedLiveMiningReviewFilterSummary()
+    {
+        SelectedLiveMiningReviewFilterSummary = BuildReviewFilterSummary("Review filter", LiveMiningReviewFilterOptions);
+    }
+
+    private static string BuildReviewFilterSummary(string prefix, IReadOnlyCollection<ReviewFilterOption> options)
+    {
+        var selected = options.Where(option => option.IsSelected).Select(option => option.DisplayName).ToList();
+
+        if (selected.Count == 0)
+        {
+            return $"{prefix}: none";
+        }
+
+        if (selected.Count == options.Count)
+        {
+            return $"{prefix}: all";
+        }
+
+        return selected.Count switch
+        {
+            1 => $"{prefix}: {selected[0]}",
+            2 => $"{prefix}: {selected[0]}, {selected[1]}",
+            _ => $"{prefix}: {selected[0]}, {selected[1]} +{selected.Count - 2}"
+        };
+    }
+
+    private static HashSet<string> GetSelectedReviewFilters(IEnumerable<ReviewFilterOption> options)
+    {
+        return options
+            .Where(option => option.IsSelected)
+            .Select(option => option.Key)
+            .ToHashSet(StringComparer.Ordinal);
     }
 
     private void ScanTargetOption_PropertyChanged(object? sender, PropertyChangedEventArgs e)

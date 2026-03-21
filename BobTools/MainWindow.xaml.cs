@@ -447,8 +447,8 @@ public partial class MainWindow : Window
 
         try
         {
-            _hotkeyService.Register(handle, _viewModel.SelectedHotkeyModifiers, _viewModel.SelectedHotkeyVirtualKey);
-            var message = $"Global hotkey active: {formattedHotkey}. If Star Citizen still blocks it, use borderless windowed mode or switch to {HotkeyCatalog.RecommendedDisplay}.";
+            var registrationResult = _hotkeyService.Register(handle, _viewModel.SelectedHotkeyModifiers, _viewModel.SelectedHotkeyVirtualKey);
+            var message = BuildHotkeyRegistrationStatusMessage(formattedHotkey, registrationResult);
             _viewModel.SetHotkeyRegistrationStatus(message);
             WriteHotkeyDiagnostic("Registered", message, null);
         }
@@ -458,6 +458,32 @@ public partial class MainWindow : Window
             _viewModel.SetHotkeyRegistrationStatus(message);
             WriteHotkeyDiagnostic("RegistrationFailed", message, ex);
         }
+    }
+
+    private static string BuildHotkeyRegistrationStatusMessage(string formattedHotkey, HotkeyRegistrationResult registrationResult)
+    {
+        if (registrationResult.HasWindowMessageRegistration && registrationResult.HasKeyboardHookRegistration)
+        {
+            return $"Hotkey active: {formattedHotkey}. Windows hotkey registration and a keyboard-hook fallback are both enabled for Star Citizen focus.";
+        }
+
+        if (registrationResult.HasKeyboardHookRegistration)
+        {
+            var errorSuffix = registrationResult.RegisterHotKeyErrorCode is int errorCode
+                ? $" Standard Windows registration failed with Win32 {errorCode}, but the keyboard-hook fallback remains active."
+                : " Keyboard-hook fallback is active for Star Citizen-focused capture.";
+            return $"Hotkey active: {formattedHotkey}.{errorSuffix}";
+        }
+
+        if (registrationResult.HasWindowMessageRegistration)
+        {
+            var fallbackSuffix = registrationResult.KeyboardHookErrorCode is int errorCode
+                ? $" Keyboard-hook fallback could not start (Win32 {errorCode}), so capture still depends on Windows hotkey delivery."
+                : string.Empty;
+            return $"Hotkey active: {formattedHotkey}. If Star Citizen still blocks it, use {HotkeyCatalog.RecommendedDisplay} or check the hotkey log.{fallbackSuffix}";
+        }
+
+        return $"Hotkey activation failed for {formattedHotkey}.";
     }
 
     private static void WriteHotkeyDiagnostic(string eventName, string message, Exception? exception)
