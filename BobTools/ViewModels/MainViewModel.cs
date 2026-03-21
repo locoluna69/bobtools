@@ -5,6 +5,7 @@ using BobTools.Services;
 using BobTools.Utils;
 using BobTools.Views;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
@@ -14,6 +15,7 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Windows.Threading;
 using System.Windows;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -25,6 +27,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 {
     private readonly ISettingsService _settingsService;
     private readonly ISessionHistoryService _sessionHistoryService;
+    private readonly IGlobalResultsStore _globalResultsStore;
     private readonly IScreenCaptureService _screenCaptureService;
     private readonly IOcrService _ocrService;
     private readonly IRsiProfileImageService _rsiProfileImageService;
@@ -36,6 +39,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private readonly CancellationTokenSource _liveMiningQueueCancellation = new();
     private readonly Task _liveScanQueueTask;
     private readonly Task _liveMiningQueueTask;
+    private readonly ICollectionView _liveScanResultsView;
+    private readonly ICollectionView _liveMiningResultsView;
     private readonly List<string> _offlineScanInputImagePaths = [];
     private readonly List<string> _offlineMiningInputImagePaths = [];
     private bool _isUpdatingScanTargetSelection;
@@ -98,6 +103,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private int selectedMainTabIndex;
     [ObservableProperty] private bool isScanTargetSelectorOpen;
     [ObservableProperty] private string selectedScanTargetsSummary = "Highlight targets: none";
+    [ObservableProperty] private string selectedLiveScanReviewFilter = "All";
+    [ObservableProperty] private string selectedLiveMiningReviewFilter = "All";
+    [ObservableProperty] private string scanTrainingDatasetSummary = "Scan dataset: 0 total | 0 pending | 0 reviewed | 0 exported | 0 rejected";
+    [ObservableProperty] private string miningReviewDatasetSummary = "Mining dataset: 0 total | 0 pending | 0 reviewed | 0 rejected";
     [ObservableProperty] private double offlinePreviewWidth = 640;
     [ObservableProperty] private double offlinePreviewHeight = 280;
     [ObservableProperty] private double offlineSelectionLeft;
@@ -122,6 +131,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public ICommand OpenDebugFolderCommand { get; }
     public ICommand LoadLiveMiningFolderCommand { get; }
     public ICommand ExportScanTrainingPackageCommand { get; }
+    public ICommand ClearPersistedResultsDataCommand { get; }
+    public ICommand PurgeRejectedScanRecordsCommand { get; }
+    public ICommand PurgeRejectedMiningRecordsCommand { get; }
     public ICommand ApplyRecommendedHotkeyCommand { get; }
     public ICommand ToggleHotkeyRecordingCommand { get; }
     public ICommand ToggleCompactModeCommand { get; }
@@ -149,6 +161,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public ObservableCollection<MiningLocationOption> SessionLocationOptions { get; } = new();
     public ObservableCollection<LiveScanResultItem> LiveScanResults { get; } = new();
     public ObservableCollection<OfflineMiningResultItem> LiveMiningResults { get; } = new();
+    public ICollectionView LiveScanResultsView => _liveScanResultsView;
+    public ICollectionView LiveMiningResultsView => _liveMiningResultsView;
+    public IReadOnlyList<string> LiveScanReviewFilterOptions { get; } = ["All", ScanReviewCatalog.Pending, ScanReviewCatalog.Reviewed, ScanReviewCatalog.Rejected, "Exported"];
+    public IReadOnlyList<string> LiveMiningReviewFilterOptions { get; } = ["All", ScanReviewCatalog.Pending, ScanReviewCatalog.Reviewed, ScanReviewCatalog.Rejected];
 
     public bool IsOfflineMiningSelected => string.Equals(OfflineSelectedCaptureProfile, CaptureProfileCatalog.Mining, StringComparison.OrdinalIgnoreCase);
     public bool IsScanningMode => string.Equals(SelectedWorkflowMode, WorkflowModeCatalog.Scanning, StringComparison.OrdinalIgnoreCase);
@@ -172,10 +188,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public string CompactModeBadgeLabel => IsMiningMode ? "MINING" : "SCAN";
     public string CompactModeSubtitle => IsMiningMode ? "Ore sweep and fracture stats" : "Signature sweep and target hits";
 
-    public MainViewModel(ISettingsService settingsService, ISessionHistoryService sessionHistoryService, IScreenCaptureService screenCaptureService, IOcrService ocrService, IRsiProfileImageService rsiProfileImageService)
+    public MainViewModel(ISettingsService settingsService, ISessionHistoryService sessionHistoryService, IGlobalResultsStore globalResultsStore, IScreenCaptureService screenCaptureService, IOcrService ocrService, IRsiProfileImageService rsiProfileImageService)
     {
         _settingsService = settingsService;
         _sessionHistoryService = sessionHistoryService;
+        _globalResultsStore = globalResultsStore;
         _screenCaptureService = screenCaptureService;
         _ocrService = ocrService;
         _rsiProfileImageService = rsiProfileImageService;
@@ -244,11 +261,17 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _overlayRefreshTimer.Start();
         _liveScanQueueTask = Task.Run(() => ProcessLiveScanQueueAsync(_liveMiningQueueCancellation.Token));
         _liveMiningQueueTask = Task.Run(() => ProcessLiveMiningQueueAsync(_liveMiningQueueCancellation.Token));
-        LiveScanResults.CollectionChanged += (_, _) => UpdateCompactResults();
-        LiveMiningResults.CollectionChanged += (_, _) => UpdateCompactResults();
+        _liveScanResultsView = CollectionViewSource.GetDefaultView(LiveScanResults);
+        _liveScanResultsView.Filter = ShouldIncludeLiveScanResult;
+        _liveMiningResultsView = CollectionViewSource.GetDefaultView(LiveMiningResults);
+        _liveMiningResultsView.Filter = ShouldIncludeLiveMiningResult;
+        LiveScanResults.CollectionChanged += LiveScanResults_CollectionChanged;
+        LiveMiningResults.CollectionChanged += LiveMiningResults_CollectionChanged;
         LoadScanTargetOptions();
         LoadMiningSessionContextOptions();
+        SeedGlobalResultsStore();
         LoadPersistedLiveResults();
+        _ = ResumePendingLiveQueueEntriesAsync();
         UpdateCaptureRegionSummaries();
         UpdateLiveScanQueueSummary();
         UpdateConfiguredHotkeySummary();
@@ -266,6 +289,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         OpenDebugFolderCommand = new RelayCommand(OpenDebugFolder);
         LoadLiveMiningFolderCommand = new AsyncRelayCommand(LoadLiveMiningFolderAsync);
         ExportScanTrainingPackageCommand = new RelayCommand(ExportScanTrainingPackage);
+        ClearPersistedResultsDataCommand = new RelayCommand(ClearPersistedResultsData);
+        PurgeRejectedScanRecordsCommand = new RelayCommand(PurgeRejectedScanRecords);
+        PurgeRejectedMiningRecordsCommand = new RelayCommand(PurgeRejectedMiningRecords);
         ApplyRecommendedHotkeyCommand = new RelayCommand(ApplyRecommendedHotkey);
         ToggleHotkeyRecordingCommand = new RelayCommand(ToggleHotkeyRecording);
         ToggleCompactModeCommand = new RelayCommand(ToggleCompactMode);
@@ -279,7 +305,20 @@ public partial class MainViewModel : ObservableObject, IDisposable
         DeleteOfflineMiningRowCommand = new RelayCommand<OfflineMiningElementEditRow>(DeleteOfflineMiningRow);
         SelectAllScanTargetsCommand = new RelayCommand(() => SetAllScanTargets(true));
         ClearScanTargetsCommand = new RelayCommand(() => SetAllScanTargets(false));
+        UpdateScanTrainingDatasetSummary();
+        UpdateMiningReviewDatasetSummary();
     }
+
+    partial void OnSelectedLiveScanReviewFilterChanged(string value)
+    {
+        _liveScanResultsView.Refresh();
+    }
+
+    partial void OnSelectedLiveMiningReviewFilterChanged(string value)
+    {
+        _liveMiningResultsView.Refresh();
+    }
+
     partial void OnIsCompactModeChanged(bool value)
     {
         _settings.IsCompactMode = value;
@@ -296,6 +335,127 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         LatestLiveScanResult = LiveScanResults.FirstOrDefault();
         LatestLiveMiningResult = LiveMiningResults.FirstOrDefault();
+    }
+
+    private bool ShouldIncludeLiveScanResult(object item)
+    {
+        if (item is not LiveScanResultItem resultItem)
+        {
+            return false;
+        }
+
+        return SelectedLiveScanReviewFilter switch
+        {
+            ScanReviewCatalog.Pending => string.Equals(resultItem.ReviewStatus, ScanReviewCatalog.Pending, StringComparison.Ordinal),
+            ScanReviewCatalog.Reviewed => string.Equals(resultItem.ReviewStatus, ScanReviewCatalog.Reviewed, StringComparison.Ordinal)
+                && resultItem.ExportedAtUtc is null,
+            ScanReviewCatalog.Rejected => string.Equals(resultItem.ReviewStatus, ScanReviewCatalog.Rejected, StringComparison.Ordinal),
+            "Exported" => resultItem.ExportedAtUtc is not null,
+            _ => true
+        };
+    }
+
+    private bool ShouldIncludeLiveMiningResult(object item)
+    {
+        if (item is not OfflineMiningResultItem resultItem)
+        {
+            return false;
+        }
+
+        return SelectedLiveMiningReviewFilter switch
+        {
+            ScanReviewCatalog.Pending => string.Equals(resultItem.ReviewStatus, ScanReviewCatalog.Pending, StringComparison.Ordinal),
+            ScanReviewCatalog.Reviewed => string.Equals(resultItem.ReviewStatus, ScanReviewCatalog.Reviewed, StringComparison.Ordinal),
+            ScanReviewCatalog.Rejected => string.Equals(resultItem.ReviewStatus, ScanReviewCatalog.Rejected, StringComparison.Ordinal),
+            _ => true
+        };
+    }
+
+    private void LiveScanResults_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.OldItems is not null)
+        {
+            foreach (var item in e.OldItems.OfType<LiveScanResultItem>())
+            {
+                item.PropertyChanged -= LiveScanResultItem_PropertyChanged;
+            }
+        }
+
+        if (e.NewItems is not null)
+        {
+            foreach (var item in e.NewItems.OfType<LiveScanResultItem>())
+            {
+                item.PropertyChanged += LiveScanResultItem_PropertyChanged;
+            }
+        }
+
+        UpdateCompactResults();
+        UpdateScanTrainingDatasetSummary();
+        _liveScanResultsView.Refresh();
+    }
+
+    private void LiveScanResultItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(LiveScanResultItem.ReviewStatus)
+            or nameof(LiveScanResultItem.ExportedAtUtc)
+            or nameof(LiveScanResultItem.ExportBatchId))
+        {
+            UpdateScanTrainingDatasetSummary();
+            _liveScanResultsView.Refresh();
+        }
+    }
+
+    private void LiveMiningResults_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.OldItems is not null)
+        {
+            foreach (var item in e.OldItems.OfType<OfflineMiningResultItem>())
+            {
+                item.PropertyChanged -= LiveMiningResultItem_PropertyChanged;
+            }
+        }
+
+        if (e.NewItems is not null)
+        {
+            foreach (var item in e.NewItems.OfType<OfflineMiningResultItem>())
+            {
+                item.PropertyChanged += LiveMiningResultItem_PropertyChanged;
+            }
+        }
+
+        UpdateCompactResults();
+        UpdateMiningReviewDatasetSummary();
+        _liveMiningResultsView.Refresh();
+    }
+
+    private void LiveMiningResultItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(OfflineMiningResultItem.ReviewStatus)
+            or nameof(OfflineMiningResultItem.ExportedAtUtc)
+            or nameof(OfflineMiningResultItem.ExportBatchId))
+        {
+            UpdateMiningReviewDatasetSummary();
+            _liveMiningResultsView.Refresh();
+        }
+    }
+
+    private void UpdateScanTrainingDatasetSummary()
+    {
+        var totalCount = LiveScanResults.Count;
+        var pendingCount = LiveScanResults.Count(item => string.Equals(item.ReviewStatus, ScanReviewCatalog.Pending, StringComparison.Ordinal));
+        var reviewedCount = LiveScanResults.Count(item => string.Equals(item.ReviewStatus, ScanReviewCatalog.Reviewed, StringComparison.Ordinal) && item.ExportedAtUtc is null);
+        var exportedCount = LiveScanResults.Count(item => item.ExportedAtUtc is not null);
+        var rejectedCount = LiveScanResults.Count(item => string.Equals(item.ReviewStatus, ScanReviewCatalog.Rejected, StringComparison.Ordinal));
+        ScanTrainingDatasetSummary = $"Scan dataset: {totalCount} total | {pendingCount} pending | {reviewedCount} reviewed | {exportedCount} exported | {rejectedCount} rejected";
+    }
+
+    private void UpdateMiningReviewDatasetSummary()
+    {
+        var totalCount = LiveMiningResults.Count;
+        var pendingCount = LiveMiningResults.Count(item => string.Equals(item.ReviewStatus, ScanReviewCatalog.Pending, StringComparison.Ordinal));
+        var reviewedCount = LiveMiningResults.Count(item => string.Equals(item.ReviewStatus, ScanReviewCatalog.Reviewed, StringComparison.Ordinal));
+        var rejectedCount = LiveMiningResults.Count(item => string.Equals(item.ReviewStatus, ScanReviewCatalog.Rejected, StringComparison.Ordinal));
+        MiningReviewDatasetSummary = $"Mining dataset: {totalCount} total | {pendingCount} pending | {reviewedCount} reviewed | {rejectedCount} rejected";
     }
     private void ToggleCompactMode()
     {
@@ -626,15 +786,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private async Task EnqueueLiveMiningImageAsync(string sourceImagePath, string? debugOutputDirectory, string captureProfile, string queuedSummary)
     {
-        var placeholderScan = new RockScan
-        {
-            SessionId = App.SessionId,
-            TimestampUtc = DateTime.UtcNow,
-            SourceType = "live",
-            CaptureProfile = captureProfile,
-            SourceImagePath = sourceImagePath,
-            DebugFolderPath = debugOutputDirectory
-        };
+        var placeholderScan = CreateMiningScanBase("live", captureProfile, sourceImagePath, debugOutputDirectory);
 
         var resultItem = new OfflineMiningResultItem(
             sourceImagePath,
@@ -646,10 +798,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
             message => Status = message,
             PersistMiningSessionHistoryFromItem,
             "Queued",
+            true,
             true);
 
         LiveMiningResults.Insert(0, resultItem);
-        PersistMiningSessionHistory(placeholderScan, WorkflowModeCatalog.Mining, string.Empty, string.Empty, "Queued", queuedSummary, sourceImagePath);
+        PersistMiningSessionHistoryFromItem(resultItem);
         UpdateLiveMiningQueueSummary();
 
         await _liveMiningQueue.Writer.WriteAsync(
@@ -830,29 +983,61 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    private void SeedGlobalResultsStore()
+    {
+        if (_globalResultsStore.Exists())
+        {
+            return;
+        }
+
+        var records = _sessionHistoryService.LoadAllDocuments()
+            .SelectMany(document => document.Events.Select(entry => CreateGlobalResultRecordFromHistory(document, entry)))
+            .Where(record => record is not null)
+            .Select(record => record!)
+            .GroupBy(record => record.Id, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(record => record.LastUpdatedUtc)
+                .ThenByDescending(record => record.Entry.TimestampUtc)
+                .First())
+            .ToList();
+
+        if (records.Count == 0)
+        {
+            return;
+        }
+
+        _globalResultsStore.ReplaceAll(records);
+    }
+
     private void LoadPersistedLiveResults()
     {
         LiveScanResults.Clear();
         LiveMiningResults.Clear();
 
-        var historyEntries = _sessionHistoryService.LoadAllDocuments()
-            .SelectMany(document => document.Events.Select(entry => (Document: document, Entry: entry)))
-            .OrderByDescending(item => item.Entry.TimestampUtc)
+        var persistedEntries = _globalResultsStore.LoadAll()
+            .Where(record => record.Entry is not null)
+            .GroupBy(record => record.Id, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group
+                .OrderByDescending(record => record.LastUpdatedUtc)
+                .ThenByDescending(record => record.Entry.TimestampUtc)
+                .First())
+            .OrderByDescending(record => record.Entry.TimestampUtc)
             .ToList();
 
-        foreach (var (document, entry) in historyEntries)
+        foreach (var record in persistedEntries)
         {
+            var entry = record.Entry;
             if (string.Equals(entry.ResultKind, "scan", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(entry.SourceType, "offline", StringComparison.OrdinalIgnoreCase))
             {
-                LiveScanResults.Add(CreateLiveScanResultFromHistory(document, entry));
+                LiveScanResults.Add(CreateLiveScanResultFromRecord(record));
                 continue;
             }
 
             if (string.Equals(entry.ResultKind, "mining", StringComparison.OrdinalIgnoreCase)
                 && !string.Equals(entry.WorkflowMode, WorkflowModeCatalog.Offline, StringComparison.OrdinalIgnoreCase))
             {
-                LiveMiningResults.Add(CreateLiveMiningResultFromHistory(document, entry));
+                LiveMiningResults.Add(CreateLiveMiningResultFromRecord(record));
             }
         }
 
@@ -862,14 +1047,42 @@ public partial class MainViewModel : ObservableObject, IDisposable
         UpdateLiveMiningQueueSummary();
     }
 
-    private LiveScanResultItem CreateLiveScanResultFromHistory(SessionHistoryDocument document, SessionHistoryEntry entry)
+    private async Task ResumePendingLiveQueueEntriesAsync()
     {
+        var pendingScanItems = LiveScanResults
+            .Where(item => ShouldResumeProcessing(item.ProcessingState))
+            .ToList();
+        var pendingMiningItems = LiveMiningResults
+            .Where(item => ShouldResumeProcessing(item.ProcessingState))
+            .ToList();
+
+        foreach (var resultItem in pendingScanItems)
+        {
+            await ResumePendingLiveScanAsync(resultItem);
+        }
+
+        foreach (var resultItem in pendingMiningItems)
+        {
+            await ResumePendingLiveMiningAsync(resultItem);
+        }
+
+        if (pendingScanItems.Count > 0 || pendingMiningItems.Count > 0)
+        {
+            UpdateLiveScanQueueSummary();
+            UpdateLiveMiningQueueSummary();
+            Status = $"Resumed {pendingScanItems.Count} scan and {pendingMiningItems.Count} mining queue item(s) from session history.";
+        }
+    }
+
+    private LiveScanResultItem CreateLiveScanResultFromRecord(GlobalResultRecord record)
+    {
+        var entry = record.Entry;
         var sourceImagePath = entry.SourceImagePath
             ?? entry.ProcessedImagePath
             ?? string.Empty;
         var resultItem = new LiveScanResultItem(
             entry.Id,
-            document.SessionId,
+            record.SessionId,
             entry.TimestampUtc,
             sourceImagePath,
             entry.DebugFolderPath,
@@ -890,12 +1103,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
             entry.ProcessingState,
             entry.Scan?.SelectedTargets,
             string.IsNullOrWhiteSpace(entry.Scan?.CorrectValue) ? entry.OcrText : entry.Scan!.CorrectValue);
+        resultItem.ApplyReviewMetadata(record.ReviewStatus, record.ExportedAtUtc, record.ExportBatchId);
 
         return resultItem;
     }
 
-    private OfflineMiningResultItem CreateLiveMiningResultFromHistory(SessionHistoryDocument document, SessionHistoryEntry entry)
+    private OfflineMiningResultItem CreateLiveMiningResultFromRecord(GlobalResultRecord record)
     {
+        var entry = record.Entry;
         var sourceImagePath = entry.SourceImagePath
             ?? entry.ProcessedImagePath
             ?? string.Empty;
@@ -903,7 +1118,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         var restoredScan = (entry.Mining?.RockScan ?? new RockScan()) with
         {
             Id = entry.Id,
-            SessionId = document.SessionId,
+            SessionId = record.SessionId,
             TimestampUtc = entry.TimestampUtc,
             SourceType = entry.SourceType,
             CaptureProfile = entry.CaptureProfile,
@@ -922,11 +1137,152 @@ public partial class MainViewModel : ObservableObject, IDisposable
             message => Status = message,
             PersistMiningSessionHistoryFromItem,
             entry.ProcessingState,
-            false);
+            false,
+            true);
 
         resultItem.UsedOcrModeSummary = entry.OcrMode;
         resultItem.OcrSourceSummary = entry.OcrSourceSummary;
+        resultItem.ApplyReviewMetadata(record.ReviewStatus, record.ExportedAtUtc, record.ExportBatchId);
         return resultItem;
+    }
+
+    private GlobalResultRecord? CreateGlobalResultRecordFromHistory(SessionHistoryDocument document, SessionHistoryEntry entry)
+    {
+        if (string.Equals(entry.ResultKind, "scan", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(entry.SourceType, "offline", StringComparison.OrdinalIgnoreCase))
+        {
+            return new GlobalResultRecord
+            {
+                Id = entry.Id,
+                SessionId = document.SessionId,
+                LastUpdatedUtc = document.LastUpdatedUtc,
+                ReviewStatus = ScanReviewCatalog.Pending,
+                ExportedAtUtc = null,
+                ExportBatchId = string.Empty,
+                Entry = CloneSessionHistoryEntry(entry)
+            };
+        }
+
+        if (string.Equals(entry.ResultKind, "mining", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(entry.WorkflowMode, WorkflowModeCatalog.Offline, StringComparison.OrdinalIgnoreCase))
+        {
+            var sourceImagePath = entry.SourceImagePath
+                ?? entry.ProcessedImagePath
+                ?? string.Empty;
+            var mergedRockScan = MergeRockScanWithSessionMetadata((entry.Mining?.RockScan ?? new RockScan()) with
+            {
+                Id = entry.Id,
+                SessionId = document.SessionId,
+                TimestampUtc = entry.TimestampUtc,
+                SourceType = entry.SourceType,
+                CaptureProfile = entry.CaptureProfile,
+                SourceImagePath = sourceImagePath,
+                DebugFolderPath = entry.DebugFolderPath,
+                SourceText = entry.OcrText
+            }, document.Metadata, preferSessionLocation: !RockScanHasSessionMetadata(entry.Mining?.RockScan));
+
+            var clonedEntry = CloneSessionHistoryEntry(entry);
+            clonedEntry.SourceImagePath = sourceImagePath;
+            clonedEntry.Mining = new MiningSessionPayload
+            {
+                Summary = entry.Mining?.Summary ?? entry.ProcessingState,
+                RockScan = mergedRockScan
+            };
+
+            return new GlobalResultRecord
+            {
+                Id = entry.Id,
+                SessionId = document.SessionId,
+                LastUpdatedUtc = document.LastUpdatedUtc,
+                ReviewStatus = ScanReviewCatalog.Pending,
+                ExportedAtUtc = null,
+                ExportBatchId = string.Empty,
+                Entry = clonedEntry
+            };
+        }
+
+        return null;
+    }
+
+    private static SessionHistoryEntry CloneSessionHistoryEntry(SessionHistoryEntry entry)
+    {
+        return new SessionHistoryEntry
+        {
+            Id = entry.Id,
+            ResultKind = entry.ResultKind,
+            TimestampUtc = entry.TimestampUtc,
+            WorkflowMode = entry.WorkflowMode,
+            CaptureProfile = entry.CaptureProfile,
+            SourceType = entry.SourceType,
+            SourceImagePath = entry.SourceImagePath,
+            ProcessedImagePath = entry.ProcessedImagePath,
+            DebugFolderPath = entry.DebugFolderPath,
+            OcrText = entry.OcrText,
+            OcrMode = entry.OcrMode,
+            OcrSourceSummary = entry.OcrSourceSummary,
+            ProcessingState = entry.ProcessingState,
+            Scan = entry.Scan is null
+                ? null
+                : new ScanSessionPayload
+                {
+                    Summary = entry.Scan.Summary,
+                    CorrectValue = entry.Scan.CorrectValue,
+                    MatchedResource = entry.Scan.MatchedResource,
+                    IsTargetMatch = entry.Scan.IsTargetMatch,
+                    SelectedTargets = [.. entry.Scan.SelectedTargets]
+                },
+            Mining = entry.Mining is null
+                ? null
+                : new MiningSessionPayload
+                {
+                    Summary = entry.Mining.Summary,
+                    RockScan = entry.Mining.RockScan
+                }
+        };
+    }
+
+    private async Task ResumePendingLiveScanAsync(LiveScanResultItem resultItem)
+    {
+        if (string.IsNullOrWhiteSpace(resultItem.SourceImagePath) || !File.Exists(resultItem.SourceImagePath))
+        {
+            resultItem.ApplyProcessingFailure("Failed: source image not found for resumed scan queue item.");
+            PersistLiveScanResultItem(resultItem);
+            return;
+        }
+
+        resultItem.SetProcessingState("Queued for resume...", true);
+        PersistLiveScanResultItem(resultItem);
+
+        await _liveScanQueue.Writer.WriteAsync(
+            new QueuedLiveScanCapture(
+                resultItem.SourceImagePath,
+                resultItem.DebugFolderPath,
+                SelectedOcrMode,
+                InferCaptureProfileFromPath(resultItem.SourceImagePath) ?? CaptureProfileCatalog.Signature,
+                resultItem),
+            _liveMiningQueueCancellation.Token);
+    }
+
+    private async Task ResumePendingLiveMiningAsync(OfflineMiningResultItem resultItem)
+    {
+        if (string.IsNullOrWhiteSpace(resultItem.SourceImagePath) || !File.Exists(resultItem.SourceImagePath))
+        {
+            resultItem.ApplyProcessingFailure("Failed: source image not found for resumed mining queue item.");
+            PersistMiningSessionHistoryFromItem(resultItem);
+            return;
+        }
+
+        resultItem.SetProcessingState("Queued for resume...", true);
+        PersistMiningSessionHistoryFromItem(resultItem);
+
+        await _liveMiningQueue.Writer.WriteAsync(
+            new QueuedLiveMiningCapture(
+                resultItem.SourceImagePath,
+                resultItem.ExtractedScan.DebugFolderPath,
+                SelectedOcrMode,
+                resultItem.ExtractedScan,
+                resultItem),
+            _liveMiningQueueCancellation.Token);
     }
 
     private void LoadMiningSessionContextOptions()
@@ -1666,6 +2022,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                     selectionModeSummary));
 
                 PersistScanSessionHistory(
+                    App.SessionId,
                     Guid.NewGuid().ToString(),
                     DateTime.UtcNow,
                     WorkflowModeCatalog.Offline,
@@ -2202,6 +2559,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private void PersistLiveScanResultItem(LiveScanResultItem resultItem)
     {
         PersistScanSessionHistory(
+            resultItem.SessionId,
             resultItem.HistoryEntryId,
             resultItem.TimestampUtc,
             WorkflowModeCatalog.Scanning,
@@ -2220,10 +2578,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
             resultItem.DebugFolderPath,
             resultItem.SelectedTargets);
 
-        WriteScanTrainingCsv(resultItem.SessionId);
+        _globalResultsStore.Upsert(CreateGlobalRecordFromLiveScanResult(resultItem));
     }
 
     private void PersistScanSessionHistory(
+        string sessionId,
         string entryId,
         DateTime timestampUtc,
         string workflowMode,
@@ -2242,7 +2601,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         string? debugFolderPath,
         IReadOnlyCollection<string>? selectedTargets = null)
     {
-        _sessionHistoryService.UpsertEntry(new SessionHistoryEntry
+        _sessionHistoryService.UpsertEntry(sessionId, new SessionHistoryEntry
         {
             Id = entryId,
             ResultKind = "scan",
@@ -2272,7 +2631,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void PersistMiningSessionHistory(RockScan rockScan, string workflowMode, string ocrModeSummary, string ocrSourceSummary, string processingState, string summary, string? processedImagePath)
     {
-        _sessionHistoryService.UpsertEntry(new SessionHistoryEntry
+        _sessionHistoryService.UpsertEntry(rockScan.SessionId, new SessionHistoryEntry
         {
             Id = rockScan.Id,
             ResultKind = "mining",
@@ -2309,6 +2668,80 @@ public partial class MainViewModel : ObservableObject, IDisposable
             resultItem.ProcessingState,
             resultItem.Summary,
             resultItem.ProcessedImagePath);
+
+        if (!string.Equals(resultItem.ExtractedScan.SourceType, "offline", StringComparison.OrdinalIgnoreCase))
+        {
+            _globalResultsStore.Upsert(CreateGlobalRecordFromLiveMiningResult(resultItem));
+        }
+    }
+
+    private GlobalResultRecord CreateGlobalRecordFromLiveScanResult(LiveScanResultItem resultItem)
+    {
+        return new GlobalResultRecord
+        {
+            Id = resultItem.HistoryEntryId,
+            SessionId = resultItem.SessionId,
+            ReviewStatus = resultItem.ReviewStatus,
+            ExportedAtUtc = resultItem.ExportedAtUtc,
+            ExportBatchId = resultItem.ExportBatchId,
+            Entry = new SessionHistoryEntry
+            {
+                Id = resultItem.HistoryEntryId,
+                ResultKind = "scan",
+                TimestampUtc = resultItem.TimestampUtc,
+                WorkflowMode = WorkflowModeCatalog.Scanning,
+                CaptureProfile = CaptureProfileCatalog.Signature,
+                SourceType = "live",
+                SourceImagePath = resultItem.SourceImagePath,
+                ProcessedImagePath = resultItem.ProcessedImagePath,
+                DebugFolderPath = resultItem.DebugFolderPath,
+                OcrText = resultItem.OcrText,
+                OcrMode = resultItem.UsedOcrModeSummary,
+                OcrSourceSummary = resultItem.OcrSourceSummary,
+                ProcessingState = resultItem.ProcessingState,
+                Scan = new ScanSessionPayload
+                {
+                    Summary = resultItem.SignatureResourceSummary,
+                    CorrectValue = resultItem.CorrectValue,
+                    MatchedResource = resultItem.MatchedResourceName,
+                    IsTargetMatch = resultItem.IsTargetMatch,
+                    SelectedTargets = [.. resultItem.SelectedTargets]
+                }
+            }
+        };
+    }
+
+    private GlobalResultRecord CreateGlobalRecordFromLiveMiningResult(OfflineMiningResultItem resultItem)
+    {
+        return new GlobalResultRecord
+        {
+            Id = resultItem.ExtractedScan.Id,
+            SessionId = resultItem.ExtractedScan.SessionId,
+            ReviewStatus = resultItem.ReviewStatus,
+            ExportedAtUtc = resultItem.ExportedAtUtc,
+            ExportBatchId = resultItem.ExportBatchId,
+            Entry = new SessionHistoryEntry
+            {
+                Id = resultItem.ExtractedScan.Id,
+                ResultKind = "mining",
+                TimestampUtc = resultItem.ExtractedScan.TimestampUtc,
+                WorkflowMode = WorkflowModeCatalog.Mining,
+                CaptureProfile = resultItem.ExtractedScan.CaptureProfile,
+                SourceType = resultItem.ExtractedScan.SourceType,
+                SourceImagePath = resultItem.ExtractedScan.SourceImagePath,
+                ProcessedImagePath = resultItem.ProcessedImagePath,
+                DebugFolderPath = resultItem.ExtractedScan.DebugFolderPath,
+                OcrText = resultItem.ExtractedScan.SourceText,
+                OcrMode = resultItem.UsedOcrModeSummary,
+                OcrSourceSummary = resultItem.OcrSourceSummary,
+                ProcessingState = resultItem.ProcessingState,
+                Mining = new MiningSessionPayload
+                {
+                    Summary = resultItem.Summary,
+                    RockScan = resultItem.ExtractedScan
+                }
+            }
+        };
     }
 
     private List<string> GetSelectedScanTargets()
@@ -2319,66 +2752,323 @@ public partial class MainViewModel : ObservableObject, IDisposable
             .ToList();
     }
 
-    private void WriteScanTrainingCsv(string sessionId)
-    {
-        var rows = LiveScanResults
-            .Where(item => string.Equals(item.SessionId, sessionId, StringComparison.OrdinalIgnoreCase))
-            .Select(item => new ScanTrainingExportStore.ScanTrainingRow(
-                item.SessionId,
-                item.HistoryEntryId,
-                item.TimestampUtc,
-                CaptureProfileCatalog.Signature,
-                ScanTrainingExportStore.ToSessionRelativePath(item.SessionId, item.SourceImagePath),
-                ScanTrainingExportStore.ToSessionRelativePath(item.SessionId, item.ProcessedImagePath),
-                item.OcrText,
-                item.CorrectValue,
-                item.SignatureResourceSummary,
-                item.MatchedResourceName ?? string.Empty,
-                item.IsTargetMatch,
-                item.UsedOcrModeSummary,
-                item.OcrSourceSummary,
-                item.ProcessingState,
-                string.Join(" | ", item.SelectedTargets)))
-            .ToList();
-
-        if (rows.Count == 0)
-        {
-            return;
-        }
-
-        ScanTrainingExportStore.WriteSessionCsv(sessionId, rows);
-    }
-
     private void ExportScanTrainingPackage()
     {
-        var sessionId = LiveScanResults.Any(item => string.Equals(item.SessionId, App.SessionId, StringComparison.OrdinalIgnoreCase))
-            ? App.SessionId
-            : LiveScanResults.FirstOrDefault()?.SessionId;
+        var eligibleRecords = _globalResultsStore.LoadAll()
+            .Where(record => string.Equals(record.Entry.ResultKind, "scan", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(record.Entry.SourceType, "offline", StringComparison.OrdinalIgnoreCase)
+                && record.Entry.Scan is not null
+                && ScanReviewCatalog.IsExportEligible(record.ReviewStatus, record.ExportedAtUtc))
+            .OrderByDescending(record => record.Entry.TimestampUtc)
+            .ToList();
 
-        if (string.IsNullOrWhiteSpace(sessionId))
+        if (eligibleRecords.Count == 0)
         {
-            Status = "No persisted scan results are available to export yet.";
+            Status = "No reviewed and unexported scan records are available to export.";
             return;
         }
 
         try
         {
-            WriteScanTrainingCsv(sessionId);
+            var exportedAtUtc = DateTime.UtcNow;
+            var exportBatchId = $"scan_batch_{exportedAtUtc:yyyyMMdd_HHmmss}";
+            var rows = eligibleRecords.Select(record => new ScanTrainingExportStore.ScanTrainingRow(
+                exportBatchId,
+                record.SessionId,
+                record.Entry.Id,
+                record.Entry.TimestampUtc,
+                record.Entry.CaptureProfile,
+                record.Entry.SourceImagePath,
+                record.Entry.ProcessedImagePath,
+                record.Entry.OcrText,
+                record.Entry.Scan?.CorrectValue ?? record.Entry.OcrText,
+                record.Entry.Scan?.Summary ?? string.Empty,
+                record.Entry.Scan?.MatchedResource ?? string.Empty,
+                record.Entry.Scan?.IsTargetMatch ?? false,
+                record.Entry.OcrMode,
+                record.Entry.OcrSourceSummary,
+                record.Entry.ProcessingState,
+                string.Join(" | ", record.Entry.Scan?.SelectedTargets ?? [])))
+                .ToList();
 
-            var sessionRoot = ScanTrainingExportStore.GetSessionRoot(sessionId);
-            Directory.CreateDirectory(sessionRoot);
-            if (File.Exists(_sessionHistoryService.SessionFilePath) && string.Equals(sessionId, App.SessionId, StringComparison.OrdinalIgnoreCase))
+            var zipPath = ScanTrainingExportStore.ExportBatch(exportBatchId, rows);
+            _globalResultsStore.MarkExported(eligibleRecords.Select(record => record.Id), exportBatchId, exportedAtUtc);
+
+            foreach (var item in LiveScanResults.Where(item => eligibleRecords.Any(record => string.Equals(record.Id, item.HistoryEntryId, StringComparison.OrdinalIgnoreCase))))
             {
-                File.Copy(_sessionHistoryService.SessionFilePath, Path.Combine(sessionRoot, "session.json"), true);
+                item.ApplyReviewMetadata(item.ReviewStatus, exportedAtUtc, exportBatchId);
             }
 
-            var zipPath = ScanTrainingExportStore.CreateSessionZip(sessionId);
-            Status = $"Exported scan training package for session {sessionId} to {zipPath}";
+            Status = $"Exported {eligibleRecords.Count} reviewed scan record(s) to {zipPath}";
         }
         catch (Exception ex)
         {
             Status = $"Unable to export scan training package: {ex.Message}";
         }
+    }
+
+    private void ClearPersistedResultsData()
+    {
+        if (LiveScanResults.Any(item => item.IsProcessing) || LiveMiningResults.Any(item => item.IsProcessing))
+        {
+            Status = "Wait for active live scan and mining jobs to finish before clearing persisted data.";
+            return;
+        }
+
+        var confirmation = System.Windows.MessageBox.Show(
+            "Clear the saved live scan and mining data from the global BobTools store? This does not delete exported CSV, JSON, or session history files.",
+            "Clear Persisted Live Data",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Warning,
+            System.Windows.MessageBoxResult.No);
+
+        if (confirmation != System.Windows.MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        _globalResultsStore.Clear();
+        LiveScanResults.Clear();
+        LiveMiningResults.Clear();
+        UpdateLiveScanQueueSummary();
+        UpdateLiveMiningQueueSummary();
+        Status = "Cleared the global live scan and mining store.";
+    }
+
+    private void PurgeRejectedScanRecords()
+    {
+        if (LiveScanResults.Any(item => item.IsProcessing))
+        {
+            Status = "Wait for active live scan jobs to finish before purging rejected scan records.";
+            return;
+        }
+
+        var allRecords = _globalResultsStore.LoadAll();
+        var rejectedRecords = allRecords
+            .Where(record => string.Equals(record.Entry.ResultKind, "scan", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(ScanReviewCatalog.Normalize(record.ReviewStatus), ScanReviewCatalog.Rejected, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (rejectedRecords.Count == 0)
+        {
+            Status = "No rejected scan records are available to purge.";
+            return;
+        }
+
+        var confirmation = System.Windows.MessageBox.Show(
+            $"Purge {rejectedRecords.Count} rejected scan record(s) from the shared dataset and delete their unreferenced source, processed, and debug files from disk? This cannot be undone.",
+            "Purge Rejected Scan Records",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Warning,
+            System.Windows.MessageBoxResult.No);
+
+        if (confirmation != System.Windows.MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        var keptRecords = allRecords
+            .Where(record => !rejectedRecords.Any(rejected => string.Equals(rejected.Id, record.Id, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        var retainedFilePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var retainedFolderPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var record in keptRecords)
+        {
+            AddPathIfPresent(retainedFilePaths, record.Entry.SourceImagePath);
+            AddPathIfPresent(retainedFilePaths, record.Entry.ProcessedImagePath);
+            AddPathIfPresent(retainedFolderPaths, record.Entry.DebugFolderPath);
+        }
+
+        var deletedFileCount = 0;
+        var deletedFolderCount = 0;
+
+        foreach (var record in rejectedRecords)
+        {
+            if (TryDeleteFileIfUnreferenced(record.Entry.SourceImagePath, retainedFilePaths))
+            {
+                deletedFileCount++;
+            }
+
+            if (TryDeleteFileIfUnreferenced(record.Entry.ProcessedImagePath, retainedFilePaths))
+            {
+                deletedFileCount++;
+            }
+
+            if (TryDeleteDirectoryIfUnreferenced(record.Entry.DebugFolderPath, retainedFolderPaths, retainedFilePaths))
+            {
+                deletedFolderCount++;
+            }
+        }
+
+        _globalResultsStore.ReplaceAll(keptRecords);
+
+        var purgedIds = new HashSet<string>(rejectedRecords.Select(record => record.Id), StringComparer.OrdinalIgnoreCase);
+        var liveItemsToRemove = LiveScanResults
+            .Where(item => purgedIds.Contains(item.HistoryEntryId))
+            .ToList();
+
+        foreach (var item in liveItemsToRemove)
+        {
+            LiveScanResults.Remove(item);
+        }
+
+        UpdateLiveScanQueueSummary();
+        UpdateScanTrainingDatasetSummary();
+        _liveScanResultsView.Refresh();
+        Status = $"Purged {rejectedRecords.Count} rejected scan record(s); deleted {deletedFileCount} file(s) and {deletedFolderCount} folder(s).";
+    }
+
+    private void PurgeRejectedMiningRecords()
+    {
+        if (LiveMiningResults.Any(item => item.IsProcessing))
+        {
+            Status = "Wait for active live mining jobs to finish before purging rejected mining records.";
+            return;
+        }
+
+        var allRecords = _globalResultsStore.LoadAll();
+        var rejectedRecords = allRecords
+            .Where(record => string.Equals(record.Entry.ResultKind, "mining", StringComparison.OrdinalIgnoreCase)
+                && string.Equals(ScanReviewCatalog.Normalize(record.ReviewStatus), ScanReviewCatalog.Rejected, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (rejectedRecords.Count == 0)
+        {
+            Status = "No rejected mining records are available to purge.";
+            return;
+        }
+
+        var confirmation = System.Windows.MessageBox.Show(
+            $"Purge {rejectedRecords.Count} rejected mining record(s) from the shared dataset and delete their unreferenced source, processed, and debug files from disk? This cannot be undone.",
+            "Purge Rejected Mining Records",
+            System.Windows.MessageBoxButton.YesNo,
+            System.Windows.MessageBoxImage.Warning,
+            System.Windows.MessageBoxResult.No);
+
+        if (confirmation != System.Windows.MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        var keptRecords = allRecords
+            .Where(record => !rejectedRecords.Any(rejected => string.Equals(rejected.Id, record.Id, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        var retainedFilePaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var retainedFolderPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var record in keptRecords)
+        {
+            AddPathIfPresent(retainedFilePaths, record.Entry.SourceImagePath);
+            AddPathIfPresent(retainedFilePaths, record.Entry.ProcessedImagePath);
+            AddPathIfPresent(retainedFolderPaths, record.Entry.DebugFolderPath);
+        }
+
+        var deletedFileCount = 0;
+        var deletedFolderCount = 0;
+
+        foreach (var record in rejectedRecords)
+        {
+            if (TryDeleteFileIfUnreferenced(record.Entry.SourceImagePath, retainedFilePaths))
+            {
+                deletedFileCount++;
+            }
+
+            if (TryDeleteFileIfUnreferenced(record.Entry.ProcessedImagePath, retainedFilePaths))
+            {
+                deletedFileCount++;
+            }
+
+            if (TryDeleteDirectoryIfUnreferenced(record.Entry.DebugFolderPath, retainedFolderPaths, retainedFilePaths))
+            {
+                deletedFolderCount++;
+            }
+        }
+
+        _globalResultsStore.ReplaceAll(keptRecords);
+
+        var purgedIds = new HashSet<string>(rejectedRecords.Select(record => record.Id), StringComparer.OrdinalIgnoreCase);
+        var liveItemsToRemove = LiveMiningResults
+            .Where(item => purgedIds.Contains(item.ExtractedScan.Id))
+            .ToList();
+
+        foreach (var item in liveItemsToRemove)
+        {
+            LiveMiningResults.Remove(item);
+        }
+
+        UpdateLiveMiningQueueSummary();
+        UpdateMiningReviewDatasetSummary();
+        _liveMiningResultsView.Refresh();
+        Status = $"Purged {rejectedRecords.Count} rejected mining record(s); deleted {deletedFileCount} file(s) and {deletedFolderCount} folder(s).";
+    }
+
+    private static void AddPathIfPresent(ISet<string> paths, string? path)
+    {
+        var normalizedPath = NormalizePath(path);
+        if (normalizedPath is not null)
+        {
+            paths.Add(normalizedPath);
+        }
+    }
+
+    private static bool TryDeleteFileIfUnreferenced(string? path, ISet<string> retainedFilePaths)
+    {
+        var normalizedPath = NormalizePath(path);
+        if (normalizedPath is null || retainedFilePaths.Contains(normalizedPath) || !File.Exists(normalizedPath))
+        {
+            return false;
+        }
+
+        File.Delete(normalizedPath);
+        return true;
+    }
+
+    private static bool TryDeleteDirectoryIfUnreferenced(string? path, ISet<string> retainedFolderPaths, ISet<string> retainedFilePaths)
+    {
+        var normalizedPath = NormalizePath(path);
+        if (normalizedPath is null || retainedFolderPaths.Contains(normalizedPath) || !Directory.Exists(normalizedPath))
+        {
+            return false;
+        }
+
+        foreach (var retainedFilePath in retainedFilePaths)
+        {
+            if (IsPathInsideDirectory(retainedFilePath, normalizedPath))
+            {
+                return false;
+            }
+        }
+
+        Directory.Delete(normalizedPath, recursive: true);
+        return true;
+    }
+
+    private static string? NormalizePath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            return Path.GetFullPath(path.Trim());
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static bool IsPathInsideDirectory(string path, string directoryPath)
+    {
+        var normalizedDirectory = directoryPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+
+        return path.StartsWith(normalizedDirectory, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string BuildAcceptedStatus(string captureLabel, int acceptedLength, string? debugOutputDirectory, string? csvPath, string? jsonPath)
@@ -2413,17 +3103,21 @@ public partial class MainViewModel : ObservableObject, IDisposable
             || rockScan.Elements.Count > 0;
     }
 
-    private static RockScan BuildOfflineMiningScan(string normalizedText, string sourceImagePath, string? debugOutputDirectory)
+    private static bool ShouldResumeProcessing(string? processingState)
     {
-        var baseScan = new RockScan
+        if (string.IsNullOrWhiteSpace(processingState))
         {
-            SessionId = App.SessionId,
-            TimestampUtc = DateTime.UtcNow,
-            SourceType = "offline",
-            CaptureProfile = CaptureProfileCatalog.Mining,
-            SourceImagePath = sourceImagePath,
-            DebugFolderPath = debugOutputDirectory
-        };
+            return false;
+        }
+
+        return string.Equals(processingState, "Queued", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(processingState, "Queued for resume...", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(processingState, "Processing OCR...", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private RockScan BuildOfflineMiningScan(string normalizedText, string sourceImagePath, string? debugOutputDirectory)
+    {
+        var baseScan = CreateMiningScanBase("offline", CaptureProfileCatalog.Mining, sourceImagePath, debugOutputDirectory);
 
         return BuildMiningScan(normalizedText, baseScan);
     }
@@ -2464,25 +3158,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                         processedImagePath,
                         "Processed",
                         queuedCapture.ResultItem.SelectedTargets);
-                    PersistScanSessionHistory(
-                        queuedCapture.ResultItem.HistoryEntryId,
-                        queuedCapture.ResultItem.TimestampUtc,
-                        WorkflowModeCatalog.Scanning,
-                        "live",
-                        queuedCapture.CaptureProfile,
-                        ocrResult.NormalizedText,
-                        usedOcrModeSummary,
-                        sourceSummary,
-                        "Processed",
-                        signatureSummary,
-                        queuedCapture.ResultItem.CorrectValue,
-                        matchedResourceName,
-                        isTargetMatch,
-                        queuedCapture.SourceImagePath,
-                        processedImagePath,
-                        queuedCapture.DebugOutputDirectory,
-                        queuedCapture.ResultItem.SelectedTargets);
-                    WriteScanTrainingCsv(queuedCapture.ResultItem.SessionId);
+                    PersistLiveScanResultItem(queuedCapture.ResultItem);
                     IncrementSignatureCount();
                     UpdateLiveScanQueueSummary();
                     Status = isTargetMatch
@@ -2535,7 +3211,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                     SignatureResourceSummary = "Scan resource: n/a for Mining";
                     MiningRockSummary = summary;
                     queuedCapture.ResultItem.ApplyProcessedResult(completedScan, summary, usedOcrModeSummary, ocrSourceSummary, processedImagePath, persistedJsonPath, persistedCsvPath, "Processed");
-                    PersistMiningSessionHistory(completedScan, WorkflowModeCatalog.Mining, usedOcrModeSummary, ocrSourceSummary, "Processed", summary, processedImagePath);
+                    PersistMiningSessionHistoryFromItem(queuedCapture.ResultItem);
                     if (HasMeaningfulMiningData(completedScan))
                     {
                         IncrementMiningStats(completedScan);
@@ -2553,14 +3229,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
                 {
                     queuedCapture.ResultItem.ApplyProcessingFailure($"Failed: {ex.Message}");
-                    PersistMiningSessionHistory(
-                        queuedCapture.PlaceholderScan,
-                        WorkflowModeCatalog.Mining,
-                        string.Empty,
-                        string.Empty,
-                        queuedCapture.ResultItem.ProcessingState,
-                        queuedCapture.ResultItem.Summary,
-                        queuedCapture.ResultItem.ProcessedImagePath);
+                    PersistMiningSessionHistoryFromItem(queuedCapture.ResultItem);
                     UpdateLiveMiningQueueSummary();
                     Status = $"Live mining OCR failed for {queuedCapture.ResultItem.DisplayName}: {ex.Message}";
                 });
@@ -2579,12 +3248,88 @@ public partial class MainViewModel : ObservableObject, IDisposable
             Id = baseScan.Id,
             SessionId = baseScan.SessionId,
             TimestampUtc = baseScan.TimestampUtc,
+            RsiHandle = baseScan.RsiHandle,
+            Ship = baseScan.Ship,
+            StarSystem = baseScan.StarSystem,
+            LocationKey = baseScan.LocationKey,
+            LocationName = baseScan.LocationName,
+            LocationPath = baseScan.LocationPath,
+            Location = baseScan.Location,
             SourceType = baseScan.SourceType,
             CaptureProfile = baseScan.CaptureProfile,
             SourceImagePath = baseScan.SourceImagePath,
             DebugFolderPath = baseScan.DebugFolderPath,
             SourceText = normalizedText
         };
+    }
+
+    private RockScan CreateMiningScanBase(string sourceType, string captureProfile, string? sourceImagePath, string? debugOutputDirectory)
+    {
+        var sessionMetadata = BuildCurrentSessionMetadata();
+        return new RockScan
+        {
+            SessionId = App.SessionId,
+            TimestampUtc = DateTime.UtcNow,
+            RsiHandle = sessionMetadata.RsiHandle,
+            Ship = sessionMetadata.Ship,
+            StarSystem = sessionMetadata.StarSystem,
+            LocationKey = sessionMetadata.LocationKey,
+            LocationName = sessionMetadata.LocationName,
+            LocationPath = sessionMetadata.LocationPath,
+            Location = ResolveSessionLocation(sessionMetadata),
+            SourceType = sourceType,
+            CaptureProfile = captureProfile,
+            SourceImagePath = sourceImagePath,
+            DebugFolderPath = debugOutputDirectory
+        };
+    }
+
+    private static RockScan MergeRockScanWithSessionMetadata(RockScan rockScan, SessionMetadata? sessionMetadata, bool preferSessionLocation)
+    {
+        if (sessionMetadata is null)
+        {
+            return rockScan;
+        }
+
+        var resolvedLocation = ResolveSessionLocation(sessionMetadata);
+        return rockScan with
+        {
+            RsiHandle = string.IsNullOrWhiteSpace(rockScan.RsiHandle) ? sessionMetadata.RsiHandle : rockScan.RsiHandle,
+            Ship = string.IsNullOrWhiteSpace(rockScan.Ship) ? sessionMetadata.Ship : rockScan.Ship,
+            StarSystem = string.IsNullOrWhiteSpace(rockScan.StarSystem) ? sessionMetadata.StarSystem : rockScan.StarSystem,
+            LocationKey = string.IsNullOrWhiteSpace(rockScan.LocationKey) ? sessionMetadata.LocationKey : rockScan.LocationKey,
+            LocationName = string.IsNullOrWhiteSpace(rockScan.LocationName) ? sessionMetadata.LocationName : rockScan.LocationName,
+            LocationPath = string.IsNullOrWhiteSpace(rockScan.LocationPath) ? sessionMetadata.LocationPath : rockScan.LocationPath,
+            Location = preferSessionLocation && !string.IsNullOrWhiteSpace(resolvedLocation)
+                ? resolvedLocation
+                : rockScan.Location
+        };
+    }
+
+    private static bool RockScanHasSessionMetadata(RockScan? rockScan)
+    {
+        return rockScan is not null
+            && (!string.IsNullOrWhiteSpace(rockScan.RsiHandle)
+                || !string.IsNullOrWhiteSpace(rockScan.Ship)
+                || !string.IsNullOrWhiteSpace(rockScan.StarSystem)
+                || !string.IsNullOrWhiteSpace(rockScan.LocationKey)
+                || !string.IsNullOrWhiteSpace(rockScan.LocationName)
+                || !string.IsNullOrWhiteSpace(rockScan.LocationPath));
+    }
+
+    private static string ResolveSessionLocation(SessionMetadata sessionMetadata)
+    {
+        if (!string.IsNullOrWhiteSpace(sessionMetadata.LocationPath))
+        {
+            return sessionMetadata.LocationPath;
+        }
+
+        if (!string.IsNullOrWhiteSpace(sessionMetadata.LocationName))
+        {
+            return sessionMetadata.LocationName;
+        }
+
+        return string.Empty;
     }
 
     private void UpdateLiveMiningQueueSummary()
@@ -2716,7 +3461,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         return rockScan.Elements.Count(element => element.Quality is >= 900);
     }
 
-    private static (string Summary, string? CsvPath, string? JsonPath, RockScan? CompletedScan) AppendMiningRockScanIfApplicable(string captureProfile, string? normalizedText, string sourceType, string? sourceImagePath, string? debugOutputDirectory)
+    private (string Summary, string? CsvPath, string? JsonPath, RockScan? CompletedScan) AppendMiningRockScanIfApplicable(string captureProfile, string? normalizedText, string sourceType, string? sourceImagePath, string? debugOutputDirectory)
     {
         if (!string.Equals(captureProfile, CaptureProfileCatalog.Mining, StringComparison.OrdinalIgnoreCase))
         {
@@ -2728,15 +3473,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             return ("Rock scan: unable to parse", null, null, null);
         }
 
-        var completedScan = rockScan with
-        {
-            SessionId = App.SessionId,
-            TimestampUtc = DateTime.UtcNow,
-            SourceType = sourceType,
-            CaptureProfile = captureProfile,
-            SourceImagePath = sourceImagePath,
-            DebugFolderPath = debugOutputDirectory
-        };
+        var completedScan = BuildMiningScan(normalizedText ?? string.Empty, CreateMiningScanBase(sourceType, captureProfile, sourceImagePath, debugOutputDirectory));
 
         return (
             RockScanParser.BuildSummary(completedScan),

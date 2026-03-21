@@ -8,9 +8,13 @@ namespace BobTools.Utils;
 
 internal static class RockScanCsvStore
 {
+    private const string CurrentHeader = "id,session_id,timestamp_utc,rsi_handle,ship,star_system,location_key,location_name,location_path,location,source_type,capture_profile,material,mass,resistance,instability,composition,elements_count,elements_json,parse_warnings_json,source_image_path,debug_folder_path,source_text";
+    private const string LegacyHeader = "id,session_id,timestamp_utc,location,source_type,capture_profile,material,mass,resistance,instability,composition,elements_count,elements_json,parse_warnings_json,source_image_path,debug_folder_path,source_text";
+
     public static string Append(RockScan rockScan)
     {
         var csvPath = GetCsvPath();
+        EnsureCurrentSchema(csvPath);
         var writeHeader = !File.Exists(csvPath);
 
         using var writer = new StreamWriter(csvPath, append: true, Encoding.UTF8);
@@ -27,6 +31,7 @@ internal static class RockScanCsvStore
     public static string Upsert(RockScan rockScan)
     {
         var csvPath = GetCsvPath();
+        EnsureCurrentSchema(csvPath);
 
         if (!File.Exists(csvPath))
         {
@@ -83,7 +88,7 @@ internal static class RockScanCsvStore
 
     private static string GetHeader()
     {
-        return "id,session_id,timestamp_utc,location,source_type,capture_profile,material,mass,resistance,instability,composition,elements_count,elements_json,parse_warnings_json,source_image_path,debug_folder_path,source_text";
+        return CurrentHeader;
     }
 
     private static string BuildRow(RockScan rockScan)
@@ -92,6 +97,12 @@ internal static class RockScanCsvStore
             Escape(rockScan.Id),
             Escape(rockScan.SessionId),
             Escape(rockScan.TimestampUtc.ToString("O", CultureInfo.InvariantCulture)),
+            Escape(rockScan.RsiHandle),
+            Escape(rockScan.Ship),
+            Escape(rockScan.StarSystem),
+            Escape(rockScan.LocationKey),
+            Escape(rockScan.LocationName),
+            Escape(rockScan.LocationPath),
             Escape(rockScan.Location),
             Escape(rockScan.SourceType),
             Escape(rockScan.CaptureProfile),
@@ -131,6 +142,87 @@ internal static class RockScanCsvStore
         }
 
         return value;
+    }
+
+    private static void EnsureCurrentSchema(string csvPath)
+    {
+        if (!File.Exists(csvPath))
+        {
+            return;
+        }
+
+        var lines = File.ReadAllLines(csvPath).ToList();
+        if (lines.Count == 0)
+        {
+            return;
+        }
+
+        var normalizedHeader = NormalizeHeader(lines[0]);
+        if (string.Equals(normalizedHeader, CurrentHeader, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (!string.Equals(normalizedHeader, LegacyHeader, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        lines[0] = CurrentHeader;
+        for (var index = 1; index < lines.Count; index++)
+        {
+            if (string.IsNullOrWhiteSpace(lines[index]))
+            {
+                continue;
+            }
+
+            lines[index] = UpgradeLegacyRow(lines[index]);
+        }
+
+        File.WriteAllLines(csvPath, lines, Encoding.UTF8);
+    }
+
+    private static string UpgradeLegacyRow(string line)
+    {
+        var columns = SplitCsvLine(line);
+        while (columns.Count < 17)
+        {
+            columns.Add(string.Empty);
+        }
+
+        var upgradedColumns = new[]
+        {
+            columns[0],
+            columns[1],
+            columns[2],
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            string.Empty,
+            columns[3],
+            columns[4],
+            columns[5],
+            columns[6],
+            columns[7],
+            columns[8],
+            columns[9],
+            columns[10],
+            columns[11],
+            columns[12],
+            columns[13],
+            columns[14],
+            columns[15],
+            columns[16]
+        };
+
+        return string.Join(",", upgradedColumns.Select(Escape));
+    }
+
+    private static string NormalizeHeader(string header)
+    {
+        return header.TrimStart('\uFEFF');
     }
 
     private static List<string> SplitCsvLine(string line)

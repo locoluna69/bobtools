@@ -496,6 +496,8 @@
                 <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Top">
                     <Button Width="34" Height="28" Margin="0,0,8,0" Click="MinimizeButton_Click" Content="—"
                             Background="#334155" Foreground="White" BorderBrush="#475569" />
+                    <Button Width="34" Height="28" Margin="0,0,8,0" Click="ToggleMaximizeButton_Click" Content="□"
+                        Background="#334155" Foreground="White" BorderBrush="#475569" />
                     <Button Width="34" Height="28" Click="CloseButton_Click" Content="✕"
                             Background="#7F1D1D" Foreground="White" BorderBrush="#991B1B" />
                 </StackPanel>
@@ -578,7 +580,22 @@
                                             </Style.Triggers>
                                         </Style>
                                     </StackPanel.Style>
-                                    <ItemsControl ItemsSource="{Binding LiveScanResults}">
+                                    <DockPanel Margin="0,0,0,12" LastChildFill="False">
+                                        <TextBlock DockPanel.Dock="Left"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="#94A3B8"
+                                                   FontWeight="SemiBold"
+                                                   Text="Review filter" />
+                                        <ComboBox DockPanel.Dock="Right"
+                                                  Width="150"
+                                                  Margin="12,0,0,0"
+                                                  ItemsSource="{Binding LiveScanReviewFilterOptions}"
+                                                  SelectedItem="{Binding SelectedLiveScanReviewFilter, UpdateSourceTrigger=PropertyChanged}"
+                                                  Background="#0F172A"
+                                                  Foreground="#E5E7EB"
+                                                  BorderBrush="#334155" />
+                                    </DockPanel>
+                                        <ItemsControl ItemsSource="{Binding LiveScanResultsView}">
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Border Margin="0,0,0,12" Padding="12" CornerRadius="10" Background="#8A0F172A" BorderBrush="#334155" BorderThickness="1">
@@ -606,8 +623,24 @@
                                                         <StackPanel>
                                                             <TextBlock Foreground="White" FontWeight="SemiBold" Text="{Binding DisplayName}" TextWrapping="Wrap" />
                                                             <TextBlock Margin="0,4,0,0" Foreground="#93C5FD" Text="{Binding ProcessingState}" TextWrapping="Wrap" />
+                                                            <DockPanel Margin="0,10,0,6">
+                                                                <TextBlock DockPanel.Dock="Left" Foreground="#94A3B8" VerticalAlignment="Center" Text="{Binding ImageZoomLabel}" />
+                                                                <Slider Margin="10,0,0,0"
+                                                                        Minimum="0.5"
+                                                                        Maximum="4"
+                                                                        TickFrequency="0.25"
+                                                                        IsSnapToTickEnabled="False"
+                                                                        Value="{Binding ImageZoom, Mode=TwoWay}"
+                                                                        VerticalAlignment="Center" />
+                                                            </DockPanel>
                                                             <Border Margin="0,10,0,0" Background="#0F172A" BorderBrush="#334155" BorderThickness="1" CornerRadius="6" Height="170">
-                                                                <Image Source="{Binding ProcessedPreviewImage}" Stretch="Uniform" />
+                                                                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                                                                    <Image Source="{Binding DisplayPreviewImage}" Stretch="Uniform">
+                                                                        <Image.LayoutTransform>
+                                                                            <ScaleTransform ScaleX="{Binding ImageZoom}" ScaleY="{Binding ImageZoom}" />
+                                                                        </Image.LayoutTransform>
+                                                                    </Image>
+                                                                </ScrollViewer>
                                                             </Border>
                                                         </StackPanel>
 
@@ -633,11 +666,13 @@
                                                                        FontWeight="SemiBold"
                                                                        Text="Detected" />
                                                             <TextBox Margin="0,4,0,0"
-                                                                     MinHeight="88"
-                                                                     Text="{Binding OcrText}"
-                                                                     AcceptsReturn="True"
-                                                                     TextWrapping="Wrap"
-                                                                     VerticalScrollBarVisibility="Auto"
+                                                                     Text="{Binding SingleLineOcrText, Mode=OneWay}"
+                                                                     AcceptsReturn="False"
+                                                                     MinLines="1"
+                                                                     MaxLines="1"
+                                                                     TextWrapping="NoWrap"
+                                                                     VerticalScrollBarVisibility="Disabled"
+                                                                     HorizontalScrollBarVisibility="Auto"
                                                                      IsReadOnly="True"
                                                                      Background="#0F172A"
                                                                      Foreground="#E5E7EB"
@@ -649,10 +684,40 @@
                                                                        Text="Corrected" />
                                                             <TextBox Margin="0,4,0,0"
                                                                      Text="{Binding CorrectValue, UpdateSourceTrigger=PropertyChanged}"
+                                                                     AcceptsReturn="False"
+                                                                     MinLines="1"
+                                                                     MaxLines="1"
+                                                                     TextWrapping="NoWrap"
+                                                                     VerticalScrollBarVisibility="Disabled"
+                                                                     HorizontalScrollBarVisibility="Auto"
                                                                      Background="#0F172A"
                                                                      Foreground="#E5E7EB"
                                                                      BorderBrush="#334155"
                                                                      ToolTip="Edit this value when OCR is wrong. Changes are auto-saved for training handoff." />
+                                                                                                                        <TextBlock Margin="0,10,0,0"
+                                                                                                                                             Foreground="#94A3B8"
+                                                                                                                                             FontWeight="SemiBold"
+                                                                                                                                             Text="Review" />
+                                                                                                                        <ComboBox Margin="0,4,0,0"
+                                                                                                                                            ItemsSource="{Binding ReviewStatusOptions}"
+                                                                                                                                            SelectedItem="{Binding ReviewStatus, UpdateSourceTrigger=PropertyChanged}"
+                                                                                                                                            HorizontalAlignment="Left"
+                                                                                                                                            HorizontalContentAlignment="Left"
+                                                                                                                                            Background="#0F172A"
+                                                                                                                                            Foreground="#E5E7EB"
+                                                                                                                                            BorderBrush="#334155">
+                                                                                                                            <ComboBox.ItemTemplate>
+                                                                                                                                <DataTemplate>
+                                                                                                                                    <TextBlock HorizontalAlignment="Left"
+                                                                                                                                               TextAlignment="Left"
+                                                                                                                                               Text="{Binding}" />
+                                                                                                                                </DataTemplate>
+                                                                                                                            </ComboBox.ItemTemplate>
+                                                                                                                        </ComboBox>
+                                                                                                                        <TextBlock Margin="0,6,0,0"
+                                                                                                                                             Foreground="#93C5FD"
+                                                                                                                                             FontSize="11"
+                                                                                                                                             Text="{Binding ReviewStateSummary}" />
                                                             <TextBlock Margin="0,6,0,0"
                                                                        Foreground="#94A3B8"
                                                                        FontSize="11"
@@ -676,7 +741,22 @@
                                             </Style.Triggers>
                                         </Style>
                                     </StackPanel.Style>
-                                    <ItemsControl ItemsSource="{Binding LiveMiningResults}">
+                                    <DockPanel Margin="0,0,0,12" LastChildFill="False">
+                                        <TextBlock DockPanel.Dock="Left"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="#94A3B8"
+                                                   FontWeight="SemiBold"
+                                                   Text="Review filter" />
+                                        <ComboBox DockPanel.Dock="Right"
+                                                  Width="150"
+                                                  Margin="12,0,0,0"
+                                                  ItemsSource="{Binding LiveMiningReviewFilterOptions}"
+                                                  SelectedItem="{Binding SelectedLiveMiningReviewFilter, UpdateSourceTrigger=PropertyChanged}"
+                                                  Background="#0F172A"
+                                                  Foreground="#E5E7EB"
+                                                  BorderBrush="#334155" />
+                                    </DockPanel>
+                                    <ItemsControl ItemsSource="{Binding LiveMiningResultsView}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <Border Margin="0,0,0,12" Padding="12" CornerRadius="10" Background="#8A0F172A" BorderBrush="#334155" BorderThickness="1">
@@ -690,8 +770,24 @@
                                                     <StackPanel>
                                                         <TextBlock Foreground="White" FontWeight="SemiBold" Text="{Binding DisplayName}" TextWrapping="Wrap" />
                                                         <TextBlock Margin="0,4,0,0" Foreground="#93C5FD" Text="{Binding ProcessingState}" TextWrapping="Wrap" />
+                                                        <DockPanel Margin="0,10,0,6">
+                                                            <TextBlock DockPanel.Dock="Left" Foreground="#94A3B8" VerticalAlignment="Center" Text="{Binding ImageZoomLabel}" />
+                                                            <Slider Margin="10,0,0,0"
+                                                                    Minimum="0.5"
+                                                                    Maximum="4"
+                                                                    TickFrequency="0.25"
+                                                                    IsSnapToTickEnabled="False"
+                                                                    Value="{Binding ImageZoom, Mode=TwoWay}"
+                                                                    VerticalAlignment="Center" />
+                                                        </DockPanel>
                                                         <Border Margin="0,10,0,0" Background="#0F172A" BorderBrush="#334155" BorderThickness="1" CornerRadius="6" Height="170">
-                                                            <Image Source="{Binding ProcessedPreviewImage}" Stretch="Uniform" />
+                                                            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                                                                <Image Source="{Binding DisplayPreviewImage}" Stretch="Uniform">
+                                                                    <Image.LayoutTransform>
+                                                                        <ScaleTransform ScaleX="{Binding ImageZoom}" ScaleY="{Binding ImageZoom}" />
+                                                                    </Image.LayoutTransform>
+                                                                </Image>
+                                                            </ScrollViewer>
                                                         </Border>
                                                     </StackPanel>
 
@@ -703,11 +799,12 @@
                                                                 <ColumnDefinition Width="Auto" />
                                                                 <ColumnDefinition Width="10" />
                                                                 <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="24" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                                <ColumnDefinition Width="10" />
+                                                                <ColumnDefinition Width="*" />
                                                             </Grid.ColumnDefinitions>
                                                             <Grid.RowDefinitions>
-                                                                <RowDefinition Height="Auto" />
-                                                                <RowDefinition Height="Auto" />
-                                                                <RowDefinition Height="Auto" />
                                                                 <RowDefinition Height="Auto" />
                                                                 <RowDefinition Height="Auto" />
                                                                 <RowDefinition Height="Auto" />
@@ -715,16 +812,16 @@
 
                                                             <TextBlock Text="Location" Foreground="#94A3B8" VerticalAlignment="Center" />
                                                             <TextBox Grid.Column="2" Text="{Binding EditableLocation, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                            <TextBlock Grid.Column="4" Text="Resistance" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                            <TextBox Grid.Column="6" Text="{Binding EditableResistance, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
                                                             <TextBlock Grid.Row="1" Text="Material" Foreground="#94A3B8" VerticalAlignment="Center" />
                                                             <TextBox Grid.Row="1" Grid.Column="2" Text="{Binding EditableMaterial, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                            <TextBlock Grid.Row="1" Grid.Column="4" Text="Instability" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                            <TextBox Grid.Row="1" Grid.Column="6" Text="{Binding EditableInstability, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
                                                             <TextBlock Grid.Row="2" Text="Mass" Foreground="#94A3B8" VerticalAlignment="Center" />
                                                             <TextBox Grid.Row="2" Grid.Column="2" Text="{Binding EditableMass, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
-                                                            <TextBlock Grid.Row="3" Text="Resistance" Foreground="#94A3B8" VerticalAlignment="Center" />
-                                                            <TextBox Grid.Row="3" Grid.Column="2" Text="{Binding EditableResistance, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
-                                                            <TextBlock Grid.Row="4" Text="Instability" Foreground="#94A3B8" VerticalAlignment="Center" />
-                                                            <TextBox Grid.Row="4" Grid.Column="2" Text="{Binding EditableInstability, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
-                                                            <TextBlock Grid.Row="5" Text="Composition" Foreground="#94A3B8" VerticalAlignment="Center" />
-                                                            <TextBox Grid.Row="5" Grid.Column="2" Text="{Binding EditableComposition, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                            <TextBlock Grid.Row="2" Grid.Column="4" Text="Composition" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                            <TextBox Grid.Row="2" Grid.Column="6" Text="{Binding EditableComposition, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
                                                         </Grid>
 
                                                         <WrapPanel Margin="0,0,0,8">
@@ -735,6 +832,35 @@
                                                                     Style="{StaticResource DirtyAwareSaveButtonStyle}"
                                                                     Tag="{Binding IsDirty}" />
                                                         </WrapPanel>
+
+                                                        <TextBlock Foreground="#94A3B8"
+                                                                   FontWeight="SemiBold"
+                                                                   Text="Review" />
+                                                        <ComboBox Margin="0,4,0,0"
+                                                                  Width="160"
+                                                                  HorizontalAlignment="Left"
+                                                                  ItemsSource="{Binding ReviewStatusOptions}"
+                                                                  SelectedItem="{Binding ReviewStatus, UpdateSourceTrigger=PropertyChanged}"
+                                                                  HorizontalContentAlignment="Left"
+                                                                  Background="#0F172A"
+                                                                  Foreground="#E5E7EB"
+                                                                  BorderBrush="#334155">
+                                                            <ComboBox.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <TextBlock HorizontalAlignment="Left"
+                                                                               TextAlignment="Left"
+                                                                               Text="{Binding}" />
+                                                                </DataTemplate>
+                                                            </ComboBox.ItemTemplate>
+                                                        </ComboBox>
+                                                        <TextBlock Margin="0,6,0,0"
+                                                                   Foreground="#93C5FD"
+                                                                   FontSize="11"
+                                                                   Text="{Binding ReviewStateSummary}" />
+                                                        <TextBlock Margin="0,4,0,8"
+                                                                   Foreground="#94A3B8"
+                                                                   FontSize="11"
+                                                                   Text="{Binding AutoSaveStatus, StringFormat=Save status: {0}}" />
 
                                                         <DataGrid ItemsSource="{Binding EditableElements}"
                                                                   AutoGenerateColumns="False"
@@ -789,20 +915,20 @@
                                                             <DataGrid.Columns>
                                                                 <DataGridTextColumn Header="Element"
                                                                                     Binding="{Binding Element, UpdateSourceTrigger=PropertyChanged}"
-                                                                                    Width="*"
+                                                                                    Width="SizeToCells"
                                                                                     ElementStyle="{StaticResource LiveGridTextBlockStyle}"
                                                                                     EditingElementStyle="{StaticResource LiveGridEditingTextBoxStyle}" />
                                                                 <DataGridTextColumn Header="Percentage"
                                                                                     Binding="{Binding PercentageText, UpdateSourceTrigger=PropertyChanged}"
-                                                                                    Width="110"
+                                                                                    Width="SizeToHeader"
                                                                                     ElementStyle="{StaticResource LiveGridTextBlockStyle}"
                                                                                     EditingElementStyle="{StaticResource LiveGridEditingTextBoxStyle}" />
                                                                 <DataGridTextColumn Header="Quality"
                                                                                     Binding="{Binding QualityText, UpdateSourceTrigger=PropertyChanged}"
-                                                                                    Width="90"
+                                                                                    Width="SizeToHeader"
                                                                                     ElementStyle="{StaticResource LiveGridTextBlockStyle}"
                                                                                     EditingElementStyle="{StaticResource LiveGridEditingTextBoxStyle}" />
-                                                                <DataGridTemplateColumn Header="Delete" Width="70">
+                                                                <DataGridTemplateColumn Header="Delete" Width="SizeToHeader">
                                                                     <DataGridTemplateColumn.CellTemplate>
                                                                         <DataTemplate>
                                                                             <Button Content="Delete"
@@ -1057,8 +1183,29 @@
 
                                 <GroupBox Header="Processed Image" Foreground="White" BorderBrush="#475569">
                                     <Grid Margin="6">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="8" />
+                                            <RowDefinition Height="*" />
+                                        </Grid.RowDefinitions>
+                                        <DockPanel>
+                                            <TextBlock DockPanel.Dock="Left" Foreground="#94A3B8" VerticalAlignment="Center" Text="{Binding SelectedOfflineScanResult.ImageZoomLabel}" />
+                                            <Slider Margin="10,0,0,0"
+                                                    Minimum="0.5"
+                                                    Maximum="4"
+                                                    TickFrequency="0.25"
+                                                    IsSnapToTickEnabled="False"
+                                                    Value="{Binding SelectedOfflineScanResult.ImageZoom, Mode=TwoWay}"
+                                                    VerticalAlignment="Center" />
+                                        </DockPanel>
                                         <Border Background="#0F172A" BorderBrush="#334155" BorderThickness="1" CornerRadius="6">
-                                            <Image Source="{Binding SelectedOfflineScanResult.ProcessedPreviewImage}" Stretch="Uniform" />
+                                            <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                                                <Image Source="{Binding SelectedOfflineScanResult.ProcessedPreviewImage}" Stretch="Uniform">
+                                                    <Image.LayoutTransform>
+                                                        <ScaleTransform ScaleX="{Binding SelectedOfflineScanResult.ImageZoom}" ScaleY="{Binding SelectedOfflineScanResult.ImageZoom}" />
+                                                    </Image.LayoutTransform>
+                                                </Image>
+                                            </ScrollViewer>
                                         </Border>
                                     </Grid>
                                 </GroupBox>
@@ -1268,12 +1415,28 @@
                                                                 </Grid.ColumnDefinitions>
 
                                                                 <StackPanel>
+                                                                    <DockPanel Margin="0,0,0,6">
+                                                                        <TextBlock DockPanel.Dock="Left" Foreground="#94A3B8" VerticalAlignment="Center" Text="{Binding ImageZoomLabel}" />
+                                                                        <Slider Margin="10,0,0,0"
+                                                                                Minimum="0.5"
+                                                                                Maximum="4"
+                                                                                TickFrequency="0.25"
+                                                                                IsSnapToTickEnabled="False"
+                                                                                Value="{Binding ImageZoom, Mode=TwoWay}"
+                                                                                VerticalAlignment="Center" />
+                                                                    </DockPanel>
                                                                     <Border Background="#0F172A"
                                                                             BorderBrush="#334155"
                                                                             BorderThickness="1"
                                                                             CornerRadius="8"
                                                                             Height="170">
-                                                                        <Image Source="{Binding ProcessedPreviewImage}" Stretch="Uniform" />
+                                                                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                                                                            <Image Source="{Binding DisplayPreviewImage}" Stretch="Uniform">
+                                                                                <Image.LayoutTransform>
+                                                                                    <ScaleTransform ScaleX="{Binding ImageZoom}" ScaleY="{Binding ImageZoom}" />
+                                                                                </Image.LayoutTransform>
+                                                                            </Image>
+                                                                        </ScrollViewer>
                                                                     </Border>
                                                                     <Grid Margin="0,10,0,0">
                                                                         <Grid.ColumnDefinitions>
@@ -1303,27 +1466,28 @@
                                                                                 <ColumnDefinition Width="Auto" />
                                                                                 <ColumnDefinition Width="10" />
                                                                                 <ColumnDefinition Width="*" />
+                                                                                <ColumnDefinition Width="24" />
+                                                                                <ColumnDefinition Width="Auto" />
+                                                                                <ColumnDefinition Width="10" />
+                                                                                <ColumnDefinition Width="*" />
                                                                             </Grid.ColumnDefinitions>
                                                                             <Grid.RowDefinitions>
-                                                                                <RowDefinition Height="Auto" />
-                                                                                <RowDefinition Height="Auto" />
-                                                                                <RowDefinition Height="Auto" />
                                                                                 <RowDefinition Height="Auto" />
                                                                                 <RowDefinition Height="Auto" />
                                                                                 <RowDefinition Height="Auto" />
                                                                             </Grid.RowDefinitions>
                                                                             <TextBlock Text="Location" Foreground="#94A3B8" VerticalAlignment="Center" />
                                                                             <TextBox Grid.Column="2" Text="{Binding EditableLocation, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                                            <TextBlock Grid.Column="4" Text="Resistance" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                                            <TextBox Grid.Column="6" Text="{Binding EditableResistance, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
                                                                             <TextBlock Grid.Row="1" Text="Material" Foreground="#94A3B8" VerticalAlignment="Center" />
                                                                             <TextBox Grid.Row="1" Grid.Column="2" Text="{Binding EditableMaterial, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                                            <TextBlock Grid.Row="1" Grid.Column="4" Text="Instability" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                                            <TextBox Grid.Row="1" Grid.Column="6" Text="{Binding EditableInstability, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
                                                                             <TextBlock Grid.Row="2" Text="Mass" Foreground="#94A3B8" VerticalAlignment="Center" />
                                                                             <TextBox Grid.Row="2" Grid.Column="2" Text="{Binding EditableMass, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
-                                                                            <TextBlock Grid.Row="3" Text="Resistance" Foreground="#94A3B8" VerticalAlignment="Center" />
-                                                                            <TextBox Grid.Row="3" Grid.Column="2" Text="{Binding EditableResistance, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
-                                                                            <TextBlock Grid.Row="4" Text="Instability" Foreground="#94A3B8" VerticalAlignment="Center" />
-                                                                            <TextBox Grid.Row="4" Grid.Column="2" Text="{Binding EditableInstability, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
-                                                                            <TextBlock Grid.Row="5" Text="Composition" Foreground="#94A3B8" VerticalAlignment="Center" />
-                                                                            <TextBox Grid.Row="5" Grid.Column="2" Text="{Binding EditableComposition, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
+                                                                            <TextBlock Grid.Row="2" Grid.Column="4" Text="Composition" Foreground="#94A3B8" VerticalAlignment="Center" />
+                                                                            <TextBox Grid.Row="2" Grid.Column="6" Text="{Binding EditableComposition, UpdateSourceTrigger=PropertyChanged}" Background="#0F172A" Foreground="#E5E7EB" BorderBrush="#334155" />
                                                                         </Grid>
                                                                     </Border>
 
@@ -1389,20 +1553,20 @@
                                                                         <DataGrid.Columns>
                                                                             <DataGridTextColumn Header="Element"
                                                                                                 Binding="{Binding Element, UpdateSourceTrigger=PropertyChanged}"
-                                                                                                Width="*"
+                                                                                                Width="SizeToCells"
                                                                                                 ElementStyle="{StaticResource OfflineGridTextBlockStyle}"
                                                                                                 EditingElementStyle="{StaticResource OfflineGridEditingTextBoxStyle}" />
                                                                             <DataGridTextColumn Header="Percentage"
                                                                                                 Binding="{Binding PercentageText, UpdateSourceTrigger=PropertyChanged}"
-                                                                                                Width="110"
+                                                                                                Width="SizeToHeader"
                                                                                                 ElementStyle="{StaticResource OfflineGridTextBlockStyle}"
                                                                                                 EditingElementStyle="{StaticResource OfflineGridEditingTextBoxStyle}" />
                                                                             <DataGridTextColumn Header="Quality"
                                                                                                 Binding="{Binding QualityText, UpdateSourceTrigger=PropertyChanged}"
-                                                                                                Width="90"
+                                                                                                Width="SizeToHeader"
                                                                                                 ElementStyle="{StaticResource OfflineGridTextBlockStyle}"
                                                                                                 EditingElementStyle="{StaticResource OfflineGridEditingTextBoxStyle}" />
-                                                                            <DataGridTemplateColumn Header="Delete" Width="70">
+                                                                            <DataGridTemplateColumn Header="Delete" Width="SizeToHeader">
                                                                                 <DataGridTemplateColumn.CellTemplate>
                                                                                     <DataTemplate>
                                                                                         <Button Content="Delete"

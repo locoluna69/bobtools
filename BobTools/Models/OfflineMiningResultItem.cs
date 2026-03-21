@@ -3,6 +3,7 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Globalization;
 using System.IO;
+using System.Threading;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -14,9 +15,12 @@ namespace BobTools.Models;
 public sealed partial class OfflineMiningResultItem : ObservableObject
 {
     private string _savedSnapshot = string.Empty;
+    private int _autoSaveVersion;
     private readonly Action<string>? _statusCallback;
     private readonly Action<OfflineMiningResultItem>? _persistCallback;
+    private readonly bool _enableAutoSave;
     private bool _suppressDirtyTracking;
+    private bool _suppressAutoSave;
 
     public OfflineMiningResultItem(
         string sourceImagePath,
@@ -28,12 +32,15 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
         Action<string>? statusCallback = null,
         Action<OfflineMiningResultItem>? persistCallback = null,
         string processingState = "Ready",
-        bool isProcessing = false)
+        bool isProcessing = false,
+        bool enableAutoSave = false)
     {
         SourceImagePath = sourceImagePath;
         DisplayName = Path.GetFileName(sourceImagePath);
+        SourcePreviewImage = LoadImage(sourceImagePath);
         _statusCallback = statusCallback;
         _persistCallback = persistCallback;
+        _enableAutoSave = enableAutoSave;
         ExtractedScan = extractedScan;
         this.processedImagePath = processedImagePath;
         this.processedPreviewImage = LoadImage(processedImagePath);
@@ -52,6 +59,10 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
     public string DisplayName { get; }
 
     public string SourceImagePath { get; }
+
+    public ImageSource? SourcePreviewImage { get; }
+
+    public ImageSource? DisplayPreviewImage => SourcePreviewImage ?? ProcessedPreviewImage;
 
     public IAsyncRelayCommand SaveCommand { get; }
 
@@ -80,6 +91,21 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
     [ObservableProperty] private string usedOcrModeSummary = string.Empty;
     [ObservableProperty] private string ocrSourceSummary = string.Empty;
     [ObservableProperty] private IReadOnlyList<string> selectedTargetResources = Array.Empty<string>();
+    [ObservableProperty] private double imageZoom = 0.5d;
+    [ObservableProperty] private string autoSaveStatus = string.Empty;
+    [ObservableProperty] private string reviewStatus = ScanReviewCatalog.Pending;
+    [ObservableProperty] private DateTime? exportedAtUtc;
+    [ObservableProperty] private string exportBatchId = string.Empty;
+
+    public string ImageZoomLabel => $"Zoom {Math.Round(ImageZoom * 100):0}%";
+    public IReadOnlyList<string> ReviewStatusOptions => ScanReviewCatalog.Options;
+    public string ReviewStateSummary => ExportedAtUtc is not null
+        ? $"Exported {ExportedAtUtc:yyyy-MM-dd HH:mm}"
+        : string.Equals(ReviewStatus, ScanReviewCatalog.Reviewed, StringComparison.Ordinal)
+            ? "Ready for export"
+            : string.Equals(ReviewStatus, ScanReviewCatalog.Rejected, StringComparison.Ordinal)
+                ? "Rejected from export"
+                : "Pending review";
 
     public string CompactHeadline => !string.IsNullOrWhiteSpace(ExtractedScan.Material)
         ? ExtractedScan.Material
@@ -234,7 +260,21 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
         Summary = Utils.RockScanParser.BuildSummary(savedScan);
         _savedSnapshot = BuildSnapshot();
         IsDirty = false;
+        if (_enableAutoSave)
+        {
+            AutoSaveStatus = "Saved";
+        }
         OnCompactDisplayChanged();
+    }
+
+    public void ApplyReviewMetadata(string? reviewStatusValue, DateTime? exportedAtUtcValue, string? exportBatchIdValue)
+    {
+        _suppressAutoSave = true;
+        ReviewStatus = ScanReviewCatalog.Normalize(reviewStatusValue);
+        ExportedAtUtc = exportedAtUtcValue;
+        ExportBatchId = exportBatchIdValue ?? string.Empty;
+        _suppressAutoSave = false;
+        OnPropertyChanged(nameof(ReviewStateSummary));
     }
 
     public void SetProcessingState(string state, bool value)
@@ -259,6 +299,11 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
         IsProcessing = false;
         _savedSnapshot = BuildSnapshot();
         IsDirty = false;
+        if (_enableAutoSave)
+        {
+            AutoSaveStatus = "Saved";
+        }
+        OnPropertyChanged(nameof(DisplayPreviewImage));
         OnCompactDisplayChanged();
     }
 
@@ -311,6 +356,39 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
         AddRowCommand.NotifyCanExecuteChanged();
     }
 
+    partial void OnReviewStatusChanged(string value)
+    {
+        var normalizedValue = ScanReviewCatalog.Normalize(value);
+        if (!string.Equals(value, normalizedValue, StringComparison.Ordinal))
+        {
+            ReviewStatus = normalizedValue;
+            return;
+        }
+
+        if (_enableAutoSave && !_suppressAutoSave)
+        {
+            ClearExportMetadata();
+            _ = AutoSaveAsync($"Auto-saved mining review state for {DisplayName}.", forceMetadataPersist: true);
+        }
+
+        OnPropertyChanged(nameof(ReviewStateSummary));
+    }
+
+    partial void OnExportedAtUtcChanged(DateTime? value)
+    {
+        OnPropertyChanged(nameof(ReviewStateSummary));
+    }
+
+    partial void OnExportBatchIdChanged(string value)
+    {
+        OnPropertyChanged(nameof(ReviewStateSummary));
+    }
+
+    partial void OnImageZoomChanged(double value)
+    {
+        OnPropertyChanged(nameof(ImageZoomLabel));
+    }
+
     private void SubscribeToEditableElements(ObservableCollection<OfflineMiningElementEditRow> rows)
     {
         rows.CollectionChanged -= EditableElements_CollectionChanged;
@@ -358,6 +436,16 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
         }
 
         IsDirty = !string.Equals(_savedSnapshot, BuildSnapshot(), StringComparison.Ordinal);
+
+        if (_enableAutoSave && IsDirty)
+        {
+            MarkPendingReview();
+
+            if (!IsProcessing && !HasPendingBlankElementRow())
+            {
+                _ = AutoSaveAsync($"Auto-saved mining data for {DisplayName}.");
+            }
+        }
     }
 
     private void LoadEditableValues(RockScan rockScan)
@@ -393,6 +481,68 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
 
     private async Task SaveAsync()
     {
+        await SaveAsyncInternal();
+    }
+
+    private void AddRow()
+    {
+        EditableElements.Add(new OfflineMiningElementEditRow(string.Empty, string.Empty, string.Empty));
+    }
+
+    private void DeleteRow(OfflineMiningElementEditRow? row)
+    {
+        if (row is null)
+        {
+            return;
+        }
+
+        EditableElements.Remove(row);
+    }
+
+    private async Task AutoSaveAsync(string successMessage, bool forceMetadataPersist = false)
+    {
+        if (!_enableAutoSave)
+        {
+            return;
+        }
+
+        var saveVersion = Interlocked.Increment(ref _autoSaveVersion);
+        AutoSaveStatus = "Saving...";
+
+        try
+        {
+            await Task.Delay(350);
+
+            if (saveVersion != _autoSaveVersion || IsProcessing)
+            {
+                return;
+            }
+
+            if (forceMetadataPersist && !IsDirty)
+            {
+                _persistCallback?.Invoke(this);
+                AutoSaveStatus = "Saved";
+                _statusCallback?.Invoke(successMessage);
+                return;
+            }
+
+            if (!IsDirty)
+            {
+                AutoSaveStatus = "Saved";
+                return;
+            }
+
+            await SaveAsyncInternal(successMessage);
+        }
+        catch (Exception ex)
+        {
+            AutoSaveStatus = "Save failed";
+            _statusCallback?.Invoke($"Unable to auto-save mining data for {DisplayName}: {ex.Message}");
+        }
+    }
+
+    private async Task SaveAsyncInternal(string? successMessage = null)
+    {
         if (IsProcessing)
         {
             return;
@@ -413,11 +563,15 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
             MarkSaved(updatedScan.Scan, updatedScan.JsonPath, updatedScan.CsvPath);
             ProcessingState = "Saved";
             _persistCallback?.Invoke(this);
-            _statusCallback?.Invoke($"Saved updated mining data to {updatedScan.JsonPath} and synchronized {updatedScan.CsvPath}.");
+            _statusCallback?.Invoke(successMessage ?? $"Saved updated mining data to {updatedScan.JsonPath} and synchronized {updatedScan.CsvPath}.");
         }
         catch (Exception ex)
         {
             ProcessingState = "Save failed";
+            if (_enableAutoSave)
+            {
+                AutoSaveStatus = "Save failed";
+            }
             _statusCallback?.Invoke($"Unable to save mining data for {DisplayName}: {ex.Message}");
         }
         finally
@@ -426,19 +580,42 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
         }
     }
 
-    private void AddRow()
+    private bool HasPendingBlankElementRow()
     {
-        EditableElements.Add(new OfflineMiningElementEditRow(string.Empty, string.Empty, string.Empty));
+        return EditableElements.Any(row => string.IsNullOrWhiteSpace(row.Element)
+            && string.IsNullOrWhiteSpace(row.PercentageText)
+            && string.IsNullOrWhiteSpace(row.QualityText));
     }
 
-    private void DeleteRow(OfflineMiningElementEditRow? row)
+    private void MarkPendingReview()
     {
-        if (row is null)
+        if (!_enableAutoSave)
         {
             return;
         }
 
-        EditableElements.Remove(row);
+        if (string.Equals(ReviewStatus, ScanReviewCatalog.Pending, StringComparison.Ordinal)
+            && ExportedAtUtc is null
+            && string.IsNullOrWhiteSpace(ExportBatchId))
+        {
+            return;
+        }
+
+        _suppressAutoSave = true;
+        ReviewStatus = ScanReviewCatalog.Pending;
+        ExportedAtUtc = null;
+        ExportBatchId = string.Empty;
+        _suppressAutoSave = false;
+        OnPropertyChanged(nameof(ReviewStateSummary));
+    }
+
+    private void ClearExportMetadata()
+    {
+        _suppressAutoSave = true;
+        ExportedAtUtc = null;
+        ExportBatchId = string.Empty;
+        _suppressAutoSave = false;
+        OnPropertyChanged(nameof(ReviewStateSummary));
     }
 
     private string BuildSnapshot()

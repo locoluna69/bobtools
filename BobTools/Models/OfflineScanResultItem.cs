@@ -47,6 +47,9 @@ public sealed partial class OfflineScanResultItem : ObservableObject
     [ObservableProperty] private bool isTargetMatch;
     [ObservableProperty] private string processingState = string.Empty;
     [ObservableProperty] private string selectionModeSummary = string.Empty;
+    [ObservableProperty] private double imageZoom = 1d;
+
+    public string ImageZoomLabel => $"Zoom {Math.Round(ImageZoom * 100):0}%";
 
     public string TargetAlertSummary => IsTargetMatch && !string.IsNullOrWhiteSpace(MatchedResourceName)
         ? $"Target match: {MatchedResourceName}"
@@ -60,6 +63,11 @@ public sealed partial class OfflineScanResultItem : ObservableObject
     partial void OnIsTargetMatchChanged(bool value)
     {
         OnPropertyChanged(nameof(TargetAlertSummary));
+    }
+
+    partial void OnImageZoomChanged(double value)
+    {
+        OnPropertyChanged(nameof(ImageZoomLabel));
     }
 
     private static ImageSource? LoadImage(string? path)

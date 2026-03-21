@@ -46,6 +46,7 @@ public partial class MainWindow : Window
 
         var settingsService = new SettingsService(settingsPath);
         var sessionHistoryService = new SessionHistoryService(Path.Combine(appData, "Sessions"), App.SessionId);
+        var globalResultsStore = new GlobalResultsStore(Path.Combine(appData, "live-results.json"));
         sessionHistoryService.Initialize();
 
         _hotkeyService = new HotkeyService();
@@ -54,6 +55,7 @@ public partial class MainWindow : Window
         _viewModel = new MainViewModel(
             settingsService,
             sessionHistoryService,
+            globalResultsStore,
             new ScreenCaptureService(),
             new OcrService(tessDataPath),
             new RsiProfileImageService(Path.Combine(appData, "ProfileImages")));
@@ -338,6 +340,18 @@ public partial class MainWindow : Window
     private void MinimizeButton_Click(object sender, RoutedEventArgs e)
     {
         WindowState = WindowState.Minimized;
+    }
+
+    private void ToggleMaximizeButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel.IsCompactMode)
+        {
+            return;
+        }
+
+        WindowState = WindowState == WindowState.Maximized
+            ? WindowState.Normal
+            : WindowState.Maximized;
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e)

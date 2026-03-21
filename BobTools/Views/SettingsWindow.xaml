@@ -105,14 +105,67 @@
                             <TextBlock Margin="0,4,0,0"
                                        Foreground="#94A3B8"
                                        FontSize="11"
-                                       Text="Package the current live-scan session into a zip for recognizer training review."
+                                       Text="Export all scan records that are reviewed and not yet exported into a reusable training batch."
+                                       TextWrapping="Wrap" />
+                                <TextBlock Margin="0,8,0,0"
+                                       Foreground="#93C5FD"
+                                       FontSize="11"
+                                       Text="{Binding ScanTrainingDatasetSummary}"
                                        TextWrapping="Wrap" />
                             <Button Width="160"
                                     Margin="0,12,0,0"
                                     HorizontalAlignment="Left"
-                                    Content="Export Training Zip"
+                                    Content="Export Reviewed Data"
                                     Command="{Binding ExportScanTrainingPackageCommand}" />
+                                <Button Width="190"
+                                    Margin="0,10,0,0"
+                                    HorizontalAlignment="Left"
+                                    Content="Purge Rejected Records"
+                                    Command="{Binding PurgeRejectedScanRecordsCommand}" />
                         </StackPanel>
+
+                        <StackPanel Margin="0,14,0,0">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsMiningMode}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Foreground="White" FontWeight="SemiBold" Text="Mining Reviews" />
+                            <TextBlock Margin="0,4,0,0"
+                                       Foreground="#94A3B8"
+                                       FontSize="11"
+                                       Text="Review live mining records, track dataset state, and remove rejected mining captures from the shared dataset when they are no longer needed."
+                                       TextWrapping="Wrap" />
+                            <TextBlock Margin="0,8,0,0"
+                                       Foreground="#93C5FD"
+                                       FontSize="11"
+                                       Text="{Binding MiningReviewDatasetSummary}"
+                                       TextWrapping="Wrap" />
+                            <Button Width="190"
+                                    Margin="0,12,0,0"
+                                    HorizontalAlignment="Left"
+                                    Content="Purge Rejected Mining"
+                                    Command="{Binding PurgeRejectedMiningRecordsCommand}" />
+                        </StackPanel>
+
+                                <StackPanel Margin="0,14,0,0">
+                                    <TextBlock Foreground="White" FontWeight="SemiBold" Text="Saved Live Data" />
+                                    <TextBlock Margin="0,4,0,0"
+                                           Foreground="#94A3B8"
+                                           FontSize="11"
+                                           Text="Clear the shared live scan and mining history store used to repopulate Live Results on startup. Exported files and session history are left intact."
+                                           TextWrapping="Wrap" />
+                                    <Button Width="160"
+                                        Margin="0,12,0,0"
+                                        HorizontalAlignment="Left"
+                                        Content="Clear Saved Data"
+                                        Command="{Binding ClearPersistedResultsDataCommand}" />
+                                </StackPanel>
 
                         <Border Margin="0,18,0,0"
                                 Padding="12"

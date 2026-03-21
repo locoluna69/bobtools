@@ -1,13 +1,15 @@
 # BobTools Export Training Workflow
 
+> Status note: BobTools now exports reviewed scan data as batch zips containing `manifest.csv` plus copied source and processed images. The downstream importer in `tools/signature-recognizer/scripts/import_bobtools_exports.py` still expects the older legacy session-zip format with `scan_training_labels.csv` and `session.json`. This guide now documents both the current BobTools export format and the current importer limitation.
+
 This guide explains how to go from BobTools live-scan exports to a training-ready manifest set for the signature recognizer workspace.
 
 ## What this workflow does today
 
 The current tooling supports these stages:
 
-1. Collect labeled session zip files from BobTools users.
-2. Import those zip files into the signature recognizer workspace.
+1. Collect reviewed scan-export batch zip files from BobTools users.
+2. Normalize those exports into a format the current recognizer importer can consume, or update the importer to read the batch manifest directly.
 3. Review the imported manifest and remove obviously bad samples.
 4. Prepare deduplicated `train`, `val`, and `test` manifests from the approved rows.
 
@@ -45,14 +47,20 @@ For each user session you want to use:
 3. Review the live scan rows.
 4. Correct the `CorrectValue` field where OCR was wrong.
 5. Wait for the row status to show that the label has been saved.
-6. Use the live scan export action to create a session zip.
+6. Use the Settings export action to create a reviewed scan batch zip.
 7. Collect that zip file from the exported session location.
 
 Each zip should contain:
 
-- session images
-- `scan_training_labels.csv`
-- `session.json`
+- `manifest.csv`
+- `images/source/...`
+- `images/processed/...`
+
+The current batch export only includes scan rows that are:
+
+- marked `Reviewed`
+- not previously exported
+- still present in the canonical live-results dataset
 
 ## Step 2: Stage incoming zip files
 
@@ -67,6 +75,22 @@ Copy all user-submitted BobTools export zip files into that folder.
 Keep the original zip files. They are the raw handoff artifact and should be preserved even after import.
 
 ## Step 3: Import the BobTools exports
+
+### Current limitation
+
+The current recognizer importer still expects the older legacy session export format:
+
+- `scan_training_labels.csv`
+- `session.json`
+
+It does not yet consume the new `manifest.csv` batch format directly.
+
+That means one of these needs to happen before normal import:
+
+1. Update `import_bobtools_exports.py` to read the new batch `manifest.csv` format.
+2. Build a small compatibility conversion step from batch zips to the legacy session-zip shape.
+
+Until that importer change lands, the commands below describe the current recognizer-side import entry point, not a guaranteed out-of-the-box path for new BobTools exports.
 
 From the repo root, run:
 
@@ -84,8 +108,8 @@ What this script does:
 
 1. Finds all zip files under the input path.
 2. Extracts the images into `tools/signature-recognizer/data/imports/bobtools_exports/{sessionId}`.
-3. Reads `scan_training_labels.csv` from each zip.
-4. Reads session metadata from `session.json` when present.
+3. Reads legacy `scan_training_labels.csv` from each zip.
+4. Reads legacy session metadata from `session.json` when present.
 5. Writes two manifests:
    - `bobtools_exports.csv`
    - `bobtools_exports_approved.csv`
@@ -121,6 +145,7 @@ Important:
 
 - `bobtools_exports_approved.csv` is the current intake table for training prep.
 - The importer already filters for rows that look usable, but it does not replace human review.
+- When the importer is updated for batch exports, `manifest.csv` should become the primary upstream input instead of `scan_training_labels.csv`.
 
 ## Step 5: Prepare resolved train, val, and test manifests
 
@@ -212,7 +237,7 @@ The current intended next engineering step is:
 Use these rules when collecting data from BobTools users:
 
 1. Prefer varied ships, HUD scales, resolutions, and lighting conditions.
-2. Keep exports from a single user session out of both training and final evaluation when possible.
+2. Keep exports from a single user session or batch out of both training and final evaluation when possible.
 3. Preserve corrected labels even when OCR was badly wrong. Those are often the highest-value samples.
 4. Keep original zip files archived separately from imported working data.
 5. Review each batch before promoting it into the next training run.
@@ -225,7 +250,7 @@ Install dependencies:
 pip install -r .\tools\signature-recognizer\requirements.txt
 ```
 
-Import BobTools zips:
+Import BobTools zips with the current legacy importer:
 
 ```powershell
 python .\tools\signature-recognizer\scripts\import_bobtools_exports.py .\incoming-zips
@@ -247,4 +272,4 @@ python .\tools\signature-recognizer\scripts\train.py --write-json
 
 This workflow prepares training data, but it does not yet run the neural-network training loop itself. The repo now has the export path, the import path, and the resolved-manifest generation path in place.
 
-That means the BobTools export can already be used to build a reliable reviewed dataset, even before the model-training stage is finished.
+That also means there is currently a format gap between the latest BobTools batch export and the recognizer importer. Keep this guide aligned with whichever side changes next.

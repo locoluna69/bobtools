@@ -60,13 +60,28 @@ pip install -r .\tools\signature-recognizer\requirements.txt
 
 ## BobTools export ingestion
 
-BobTools can now export a session zip that contains:
+The BobTools app now exports reviewed scan data as batch zips with:
+
+- `manifest.csv`
+- `images/source/...`
+- `images/processed/...`
+
+The current importer in `tools/signature-recognizer/scripts/import_bobtools_exports.py` is still legacy and expects:
+
+- `scan_training_labels.csv`
+- `session.json`
+
+That means the app-side export format and the recognizer-side import format are temporarily out of sync.
+
+BobTools previously exported a session zip that contained:
 
 - the live scan images for that session
 - `scan_training_labels.csv` with detected and corrected labels
 - `session.json` with session metadata
 
-Use the importer to turn one or more user-submitted zip files into a consolidated manifest:
+Until the importer is updated, treat the current import script as a legacy ingestion path.
+
+Use the importer to turn one or more legacy-compatible user-submitted zip files into a consolidated manifest:
 
 ```powershell
 python .\tools\signature-recognizer\scripts\import_bobtools_exports.py .\incoming-zips
@@ -79,7 +94,7 @@ This writes:
 - `tools/signature-recognizer/data/manifests/bobtools_exports_approved.csv`
 - `tools/signature-recognizer/outputs/reports/bobtools_export_ingest_summary.txt`
 
-The importer treats rows as approved for training when:
+The current importer treats rows as approved for training when:
 
 - the export row is in `Processed` state
 - a `correct_value` is present
@@ -89,9 +104,9 @@ For now, `preferred_image_path` points at the best available imported image from
 
 ## Recommended collection process
 
-1. Ask users to export a session zip from BobTools after they review and correct scan labels.
+1. Ask users to export a reviewed scan batch from BobTools after they review and correct scan labels.
 2. Store the submitted zip files in a local `incoming-zips` folder.
-3. Run the importer across that folder.
+3. Run the importer across that folder only after the zip format is compatible with the current script.
 4. Review `data/manifests/bobtools_exports_approved.csv` for obvious bad labels or junk captures.
 5. Promote approved rows into the next model-training dataset.
 6. Keep a held-out subset of user exports for validation and test before shipping a new ONNX model.

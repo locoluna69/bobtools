@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
+using BobTools.Utils;
 
 namespace BobTools.Models;
 
@@ -34,6 +35,7 @@ public sealed partial class LiveScanResultItem : ObservableObject
         SourceImagePath = sourceImagePath;
         DebugFolderPath = debugFolderPath;
         DisplayName = Path.GetFileName(sourceImagePath);
+        SourcePreviewImage = LoadImage(sourceImagePath);
         _persistCallback = persistCallback;
         _statusCallback = statusCallback;
         this.processedImagePath = processedImagePath;
@@ -54,6 +56,10 @@ public sealed partial class LiveScanResultItem : ObservableObject
 
     public string? DebugFolderPath { get; }
 
+    public ImageSource? SourcePreviewImage { get; }
+
+    public ImageSource? DisplayPreviewImage => SourcePreviewImage ?? ProcessedPreviewImage;
+
     [ObservableProperty] private string? processedImagePath;
     [ObservableProperty] private ImageSource? processedPreviewImage;
     [ObservableProperty] private string processingState = string.Empty;
@@ -67,11 +73,30 @@ public sealed partial class LiveScanResultItem : ObservableObject
     [ObservableProperty] private bool isTargetMatch;
     [ObservableProperty] private List<string> selectedTargets = [];
     [ObservableProperty] private string autoSaveStatus = string.Empty;
+    [ObservableProperty] private double imageZoom = 1d;
+    [ObservableProperty] private string reviewStatus = ScanReviewCatalog.Pending;
+    [ObservableProperty] private DateTime? exportedAtUtc;
+    [ObservableProperty] private string exportBatchId = string.Empty;
+
+    public string ImageZoomLabel => $"Zoom {Math.Round(ImageZoom * 100):0}%";
+    public IReadOnlyList<string> ReviewStatusOptions => ScanReviewCatalog.Options;
+
+    public string SingleLineOcrText => NormalizeSingleLine(OcrText);
+
+    public string SingleLineCorrectValue => NormalizeSingleLine(CorrectValue);
+
+    public string ReviewStateSummary => ExportedAtUtc is not null
+        ? $"Exported {ExportedAtUtc:yyyy-MM-dd HH:mm}"
+        : string.Equals(ReviewStatus, ScanReviewCatalog.Reviewed, StringComparison.Ordinal)
+            ? "Ready for export"
+            : string.Equals(ReviewStatus, ScanReviewCatalog.Rejected, StringComparison.Ordinal)
+                ? "Rejected from export"
+                : "Pending review";
 
     public string CompactPrimaryValue => !string.IsNullOrWhiteSpace(CorrectValue)
-        ? CorrectValue
+        ? SingleLineCorrectValue
         : !string.IsNullOrWhiteSpace(OcrText)
-            ? OcrText
+            ? SingleLineOcrText
             : "Waiting for scan result";
 
     public string CompactStatusSummary => IsTargetMatch && !string.IsNullOrWhiteSpace(TargetAlertSummary)
@@ -79,9 +104,9 @@ public sealed partial class LiveScanResultItem : ObservableObject
         : ProcessingState;
 
     public string CompactListSignature => !string.IsNullOrWhiteSpace(CorrectValue)
-        ? CorrectValue
+        ? SingleLineCorrectValue
         : !string.IsNullOrWhiteSpace(OcrText)
-            ? OcrText
+            ? SingleLineOcrText
             : "pending";
 
     public string CompactListResource => !string.IsNullOrWhiteSpace(MatchedResourceName)
@@ -152,6 +177,7 @@ public sealed partial class LiveScanResultItem : ObservableObject
         _lastPersistedCorrectValue = CorrectValue ?? string.Empty;
         AutoSaveStatus = string.IsNullOrWhiteSpace(CorrectValue) ? string.Empty : "Saved";
         _suppressPersistence = false;
+        OnPropertyChanged(nameof(DisplayPreviewImage));
         OnCompactDisplayChanged();
     }
 
@@ -160,6 +186,16 @@ public sealed partial class LiveScanResultItem : ObservableObject
         ProcessingState = processingState;
         IsProcessing = false;
         OnCompactDisplayChanged();
+    }
+
+    public void ApplyReviewMetadata(string? reviewStatusValue, DateTime? exportedAtUtcValue, string? exportBatchIdValue)
+    {
+        _suppressPersistence = true;
+        ReviewStatus = ScanReviewCatalog.Normalize(reviewStatusValue);
+        ExportedAtUtc = exportedAtUtcValue;
+        ExportBatchId = exportBatchIdValue ?? string.Empty;
+        _suppressPersistence = false;
+        OnPropertyChanged(nameof(ReviewStateSummary));
     }
 
     public void ApplyTargetMatchState(bool isMatchingTarget)
@@ -183,8 +219,61 @@ public sealed partial class LiveScanResultItem : ObservableObject
         OnCompactDisplayChanged();
     }
 
+    partial void OnImageZoomChanged(double value)
+    {
+        OnPropertyChanged(nameof(ImageZoomLabel));
+    }
+
+    partial void OnReviewStatusChanged(string value)
+    {
+        var normalizedValue = ScanReviewCatalog.Normalize(value);
+        if (!string.Equals(value, normalizedValue, StringComparison.Ordinal))
+        {
+            ReviewStatus = normalizedValue;
+            return;
+        }
+
+        if (!_suppressPersistence)
+        {
+            ClearExportMetadata();
+            _ = AutoSaveAsync($"Auto-saved review state for {DisplayName}.");
+        }
+
+        OnPropertyChanged(nameof(ReviewStateSummary));
+    }
+
+    partial void OnExportedAtUtcChanged(DateTime? value)
+    {
+        OnPropertyChanged(nameof(ReviewStateSummary));
+    }
+
+    partial void OnExportBatchIdChanged(string value)
+    {
+        OnPropertyChanged(nameof(ReviewStateSummary));
+    }
+
+    partial void OnOcrTextChanged(string value)
+    {
+        OnPropertyChanged(nameof(SingleLineOcrText));
+        OnCompactDisplayChanged();
+    }
+
     async partial void OnCorrectValueChanged(string value)
     {
+        var singleLineValue = NormalizeSingleLine(value);
+        if (!string.Equals(value, singleLineValue, StringComparison.Ordinal))
+        {
+            CorrectValue = singleLineValue;
+            return;
+        }
+
+        OnPropertyChanged(nameof(SingleLineCorrectValue));
+        if (!_suppressPersistence && !string.Equals(_lastPersistedCorrectValue, value ?? string.Empty, StringComparison.Ordinal))
+        {
+            MarkPendingReview();
+        }
+
+        RecomputeCorrectedResultState(value);
         OnCompactDisplayChanged();
 
         if (_suppressPersistence)
@@ -203,6 +292,82 @@ public sealed partial class LiveScanResultItem : ObservableObject
             return;
         }
 
+        await AutoSaveAsync($"Auto-saved corrected value for {DisplayName}.");
+        _lastPersistedCorrectValue = value ?? string.Empty;
+    }
+
+    private void RecomputeCorrectedResultState(string? value)
+    {
+        var normalizedValue = value?.Trim() ?? string.Empty;
+        if (IsInvalidScanValue(normalizedValue))
+        {
+            SignatureResourceSummary = "Scan resource: Invalid Scan";
+            MatchedResourceName = null;
+            IsTargetMatch = false;
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(normalizedValue))
+        {
+            SignatureResourceSummary = "Scan resource: none yet";
+            MatchedResourceName = null;
+            IsTargetMatch = false;
+            return;
+        }
+
+        var matchedResource = SignatureCatalog.FindMatchedResource(normalizedValue);
+        SignatureResourceSummary = SignatureCatalog.BuildResourceSummary(normalizedValue)
+            .Replace("Signature resource:", "Scan resource:", StringComparison.Ordinal);
+        MatchedResourceName = matchedResource;
+        IsTargetMatch = !string.IsNullOrWhiteSpace(matchedResource)
+            && SelectedTargets.Any(target => string.Equals(target, matchedResource, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool IsInvalidScanValue(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var digitsOnly = new string(value.Where(char.IsDigit).ToArray());
+        return digitsOnly.Length > 0 && digitsOnly.All(digit => digit == '0');
+    }
+
+    private static string NormalizeSingleLine(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return value ?? string.Empty;
+        }
+
+        return string.Join(" ", value
+            .Replace("\r", " ", StringComparison.Ordinal)
+            .Replace("\n", " ", StringComparison.Ordinal)
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    private void MarkPendingReview()
+    {
+        _suppressPersistence = true;
+        ReviewStatus = ScanReviewCatalog.Pending;
+        ExportedAtUtc = null;
+        ExportBatchId = string.Empty;
+        _suppressPersistence = false;
+        OnPropertyChanged(nameof(ReviewStateSummary));
+    }
+
+    private void ClearExportMetadata()
+    {
+        _suppressPersistence = true;
+        ExportedAtUtc = null;
+        ExportBatchId = string.Empty;
+        _suppressPersistence = false;
+        OnPropertyChanged(nameof(ReviewStateSummary));
+    }
+
+    private async Task AutoSaveAsync(string successMessage)
+    {
         var saveVersion = Interlocked.Increment(ref _autoSaveVersion);
         AutoSaveStatus = "Saving...";
 
@@ -216,14 +381,13 @@ public sealed partial class LiveScanResultItem : ObservableObject
             }
 
             _persistCallback?.Invoke(this);
-            _lastPersistedCorrectValue = value ?? string.Empty;
             AutoSaveStatus = "Saved";
-            _statusCallback?.Invoke($"Auto-saved corrected value for {DisplayName}.");
+            _statusCallback?.Invoke(successMessage);
         }
         catch (Exception ex)
         {
             AutoSaveStatus = "Save failed";
-            _statusCallback?.Invoke($"Failed to auto-save corrected value for {DisplayName}: {ex.Message}");
+            _statusCallback?.Invoke($"Failed to auto-save scan data for {DisplayName}: {ex.Message}");
         }
     }
 

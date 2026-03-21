@@ -45,11 +45,12 @@ public sealed class SessionHistoryService : ISessionHistoryService
         }
     }
 
-    public void UpsertEntry(SessionHistoryEntry entry)
+    public void UpsertEntry(string sessionId, SessionHistoryEntry entry)
     {
         lock (_syncRoot)
         {
-            var document = LoadDocument();
+            var resolvedSessionId = string.IsNullOrWhiteSpace(sessionId) ? _sessionId : sessionId;
+            var document = LoadDocument(resolvedSessionId);
             var existingIndex = document.Events.FindIndex(item => string.Equals(item.Id, entry.Id, StringComparison.OrdinalIgnoreCase));
             if (existingIndex >= 0)
             {
@@ -61,7 +62,7 @@ public sealed class SessionHistoryService : ISessionHistoryService
             }
 
             document.LastUpdatedUtc = DateTime.UtcNow;
-            SaveDocument(document);
+            SaveDocument(resolvedSessionId, document);
         }
     }
 
@@ -97,27 +98,45 @@ public sealed class SessionHistoryService : ISessionHistoryService
         return TryLoadDocumentFromPath(SessionFilePath, _sessionId) ?? CreateDocument();
     }
 
+    private SessionHistoryDocument LoadDocument(string sessionId)
+    {
+        var resolvedSessionId = string.IsNullOrWhiteSpace(sessionId) ? _sessionId : sessionId;
+        return TryLoadDocumentFromPath(GetSessionFilePath(resolvedSessionId), resolvedSessionId) ?? CreateDocument(resolvedSessionId);
+    }
+
     private void SaveDocument(SessionHistoryDocument document)
     {
-        document.SessionId = _sessionId;
+        SaveDocument(_sessionId, document);
+    }
+
+    private void SaveDocument(string sessionId, SessionHistoryDocument document)
+    {
+        var resolvedSessionId = string.IsNullOrWhiteSpace(sessionId) ? _sessionId : sessionId;
+        document.SessionId = resolvedSessionId;
         document.Metadata ??= new SessionMetadata();
         document.Events ??= [];
 
-        var directory = Path.GetDirectoryName(SessionFilePath)!;
+        var sessionFilePath = GetSessionFilePath(resolvedSessionId);
+        var directory = Path.GetDirectoryName(sessionFilePath)!;
         Directory.CreateDirectory(directory);
 
         var tempFilePath = Path.Combine(directory, "session.tmp");
         var json = JsonSerializer.Serialize(document, _jsonOptions);
         File.WriteAllText(tempFilePath, json);
-        File.Move(tempFilePath, SessionFilePath, overwrite: true);
+        File.Move(tempFilePath, sessionFilePath, overwrite: true);
     }
 
     private SessionHistoryDocument CreateDocument()
     {
+        return CreateDocument(_sessionId);
+    }
+
+    private SessionHistoryDocument CreateDocument(string sessionId)
+    {
         var now = DateTime.UtcNow;
         return new SessionHistoryDocument
         {
-            SessionId = _sessionId,
+            SessionId = sessionId,
             CreatedUtc = now,
             LastUpdatedUtc = now,
             Metadata = new SessionMetadata(),
@@ -125,11 +144,16 @@ public sealed class SessionHistoryService : ISessionHistoryService
         };
     }
 
+    private string GetSessionFilePath(string sessionId)
+    {
+        return Path.Combine(_sessionsRootPath, sessionId, "session.json");
+    }
+
     private SessionHistoryDocument? TryLoadDocumentFromPath(string sessionFilePath, string? fallbackSessionId = null)
     {
         if (!File.Exists(sessionFilePath))
         {
-            return fallbackSessionId is null ? null : CreateDocument();
+            return fallbackSessionId is null ? null : CreateDocument(fallbackSessionId);
         }
 
         try
@@ -138,7 +162,7 @@ public sealed class SessionHistoryService : ISessionHistoryService
             var document = JsonSerializer.Deserialize<SessionHistoryDocument>(json, _jsonOptions);
             if (document is null)
             {
-                return fallbackSessionId is null ? null : CreateDocument();
+                return fallbackSessionId is null ? null : CreateDocument(fallbackSessionId);
             }
 
             document.SessionId = string.IsNullOrWhiteSpace(document.SessionId)
@@ -158,7 +182,7 @@ public sealed class SessionHistoryService : ISessionHistoryService
         }
         catch (JsonException)
         {
-            return fallbackSessionId is null ? null : CreateDocument();
+            return fallbackSessionId is null ? null : CreateDocument(fallbackSessionId);
         }
     }
 }

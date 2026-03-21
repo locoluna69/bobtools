@@ -11,6 +11,13 @@ BobTools is a Windows WPF overlay app for Star Citizen that:
 
 ## Current most important behaviors
 
+### Shared persistence and review workflow
+
+- Live scan and live mining rows are now persisted in a canonical global store at `LocalAppData/BobTools/live-results.json`.
+- Session history still exists under `LocalAppData/BobTools/Sessions/{sessionId}/session.json`, but it is no longer the primary mutable store for live review state.
+- The Settings dialog can clear the canonical live-results store without deleting session history or exported artifacts.
+- Rehydrated live rows are restored from the canonical store on startup.
+
 ### Signature
 
 - Signature OCR uses a specialized icon-guided path when OCR mode is `Auto` or `Rightmost Numeric Value`.
@@ -27,6 +34,16 @@ BobTools is a Windows WPF overlay app for Star Citizen that:
   - the live results tab
   - the offline test tab
   - the live review dialog
+- Live scan rows now support a review-driven dataset workflow:
+  - editable `CorrectValue` with debounced auto-save
+  - review state `Pending`, `Reviewed`, or `Rejected`
+  - export metadata for reviewed scan records
+  - live-results filtering by review state
+- Settings now shows a scan dataset summary and can purge rejected scan records from the canonical store while deleting only unreferenced source, processed, and debug artifacts.
+- Scan export is now batch-based rather than session-based. Reviewed and unexported scan rows are written to `LocalAppData/BobTools/Exports/scan-training/{batchId}.zip` with:
+  - `manifest.csv`
+  - `images/source/...`
+  - `images/processed/...`
 
 ### Mining
 
@@ -45,6 +62,12 @@ BobTools is a Windows WPF overlay app for Star Citizen that:
 - Mining OCR now normalizes parsed material names against `Assets/data/commodities.json`, filtered to extractable mining commodities and still tolerant of common OCR/spelling drift.
 - Offline mining now supports a queued multi-image workflow: drop multiple images, run OCR across the batch, inspect the selected OCR image/debug artifact, edit the structured scan result inline, add or delete element rows, and save corrected JSON/CSV output.
 - Offline mining results now track unsaved edits and visually highlight the save buttons when field or element-row changes need to be persisted.
+- Live mining rows now mirror the scan review workflow in full view:
+  - editable mining fields with debounced auto-save
+  - review state `Pending`, `Reviewed`, or `Rejected`
+  - live-results filtering by review state
+  - Settings summary of mining review counts
+  - purge of rejected mining rows from the canonical store with reference-safe file cleanup
 - Session context now includes a persisted `RSI handle` alongside ship, system, and location; it is required before capture/processing and is written into saved PNG metadata.
 - The app now also attempts to load and display the public RSI citizen profile image for the current RSI handle, caching it under `LocalAppData/BobTools/ProfileImages` when the profile exposes a public avatar.
 - The top-left header now includes persisted lifetime counters for completed `Signatures`, meaningful `Rocks`, and `High Quality` ore entries. High Quality increments for each mining composition entry with quality `>= 900`.
@@ -75,7 +98,8 @@ BobTools is a Windows WPF overlay app for Star Citizen that:
 3. update OCR mode/source summary
 4. if Signature, resolve the resource from the CSV
 5. if Mining, build a rock summary and export accepted scans to both CSV and JSON
-6. for live capture, open review dialog
+6. persist or refresh the corresponding live row in the canonical global store
+7. review and edit the live row inline from the Live Results tab
 
 ### Offline capture
 
@@ -88,7 +112,10 @@ BobTools is a Windows WPF overlay app for Star Citizen that:
 
 ## Current data/debug locations
 
+- Canonical live results store: `LocalAppData/BobTools/live-results.json`
+- Session history: `LocalAppData/BobTools/Sessions/{sessionId}/session.json`
 - Local debug captures: `LocalAppData/BobTools/DebugCaptures`
+- Scan training batch exports: `LocalAppData/BobTools/Exports/scan-training/{batchId}.zip`
 - Mining scan CSV: `LocalAppData/BobTools/RockScans/rock_scans.csv`
 - Mining scan JSON: saved into the matching debug capture folder when available, otherwise `LocalAppData/BobTools/RockScans/Json`
 - Mining session ID: generated once when the app starts and reused until the app closes
@@ -108,6 +135,7 @@ BobTools is a Windows WPF overlay app for Star Citizen that:
 - Preserve partial mining elements with parse warnings instead of dropping them when OCR misses a field.
 - Keep `Assets/data/commodities.json` current, because the mining parser now uses its extractable commodity entries as the canonical material list for normalization.
 - Offline mining edits persist by overwriting `rock_scan.json` for the selected result and upserting the matching CSV row by rock scan `ID`.
+- Use review state on live rows as the gate for dataset curation instead of the old session-export model.
 
 ## Good next steps if work resumes
 
