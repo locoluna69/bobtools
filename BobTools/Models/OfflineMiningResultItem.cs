@@ -122,20 +122,21 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
                 return [];
             }
 
-            var maxQuality = ExtractedScan.Elements
-                .Where(entry => entry.Quality is not null)
-                .Select(entry => entry.Quality)
-                .DefaultIfEmpty()
-                .Max();
-
             return ExtractedScan.Elements
                 .Where(entry => !string.IsNullOrWhiteSpace(entry.Element))
                 .OrderByDescending(entry => entry.Quality ?? int.MinValue)
                 .ThenByDescending(entry => entry.Percentage ?? decimal.MinValue)
-                .Select(entry => new CompactMiningOreItem(
-                    BuildCompactOreText(entry),
-                    (maxQuality is not null && entry.Quality == maxQuality)
-                    || SelectedTargetResources.Any(resource => string.Equals(resource, entry.Element, StringComparison.OrdinalIgnoreCase))))
+                .Select(entry =>
+                {
+                    var isTargetMatch = SelectedTargetResources.Any(resource => string.Equals(resource, entry.Element, StringComparison.OrdinalIgnoreCase));
+                    var highlight = OreQualityTierCatalog.GetCompactHighlight(entry.Quality, isTargetMatch);
+
+                    return new CompactMiningOreItem(
+                        BuildCompactOreText(entry),
+                        highlight.BackgroundBrush,
+                        highlight.BorderBrush,
+                        highlight.ForegroundBrush);
+                })
                 .ToArray();
         }
     }
@@ -186,7 +187,9 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
                     : $"Location: {ExtractedScan.Location}";
             }
 
-            var qualitySuffix = bestEntry.Quality is null ? string.Empty : $" Q{bestEntry.Quality}";
+            var qualitySuffix = bestEntry.Quality is null
+                ? string.Empty
+                : $"  •  {OreQualityTierCatalog.FormatQualityDescriptor(bestEntry.Quality)}";
             var percentageSuffix = bestEntry.Percentage is null ? string.Empty : $"  •  {bestEntry.Percentage:0.##}%";
             return $"Best ore: {bestEntry.Element}{qualitySuffix}{percentageSuffix}";
         }
@@ -689,7 +692,7 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
 
         if (entry.Quality is not null)
         {
-            parts.Add($"Q{entry.Quality}");
+            parts.Add(OreQualityTierCatalog.FormatQualityDescriptor(entry.Quality));
         }
 
         if (entry.Percentage is not null)
@@ -701,7 +704,7 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
     }
 }
 
-public sealed record CompactMiningOreItem(string DisplayText, bool IsHighlighted);
+public sealed record CompactMiningOreItem(string DisplayText, string BackgroundBrush, string BorderBrush, string ForegroundBrush);
 
 public sealed partial class OfflineMiningElementEditRow : ObservableObject
 {
@@ -715,4 +718,18 @@ public sealed partial class OfflineMiningElementEditRow : ObservableObject
     [ObservableProperty] private string element = string.Empty;
     [ObservableProperty] private string percentageText = string.Empty;
     [ObservableProperty] private string qualityText = string.Empty;
+
+    public string? QualityTierKey => OreQualityTierCatalog.GetTierKey(ParseQuality());
+
+    partial void OnQualityTextChanged(string value)
+    {
+        OnPropertyChanged(nameof(QualityTierKey));
+    }
+
+    private int? ParseQuality()
+    {
+        return int.TryParse(QualityText?.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
+            ? parsed
+            : null;
+    }
 }

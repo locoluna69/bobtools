@@ -70,7 +70,7 @@ BobTools is a Windows WPF overlay app for Star Citizen that:
   - purge of rejected mining rows from the canonical store with reference-safe file cleanup
 - Session context now includes a persisted `RSI handle` alongside ship, system, and location; it is required before capture/processing and is written into saved PNG metadata.
 - The app now also attempts to load and display the public RSI citizen profile image for the current RSI handle, caching it under `LocalAppData/BobTools/ProfileImages` when the profile exposes a public avatar.
-- The top-left header now includes persisted lifetime counters for completed `Signatures`, meaningful `Rocks`, and `High Quality` ore entries. High Quality increments for each mining composition entry with quality `>= 900`.
+- The top-left header now includes persisted lifetime counters for completed `Signatures`, meaningful `Rocks`, and tiered ore finds: `Common` for quality `0-749`, `Rare` for `750-800`, `Legendary` for `801-899`, and `Mythic` for `900-999`. Only Rare/Legendary/Mythic use special highlights in mining results. Legacy `High Quality` totals migrate into the `Mythic` counter.
 
 ## Important files
 

@@ -35,8 +35,17 @@ public sealed class AppSettings
     public string RsiHandle { get; set; } = string.Empty;
     public int LifetimeSignatureCount { get; set; }
     public int LifetimeRockCount { get; set; }
-    public int LifetimeHighValueOreCount { get; set; }
+    public int LifetimeCommonOreCount { get; set; }
+    public int LifetimeRareOreCount { get; set; }
+    public int LifetimeLegendaryOreCount { get; set; }
+    public int LifetimeMythicOreCount { get; set; }
     public List<string> SelectedScanResources { get; set; } = [];
+
+    [JsonPropertyName("lifetimeHighValueOreCount")]
+    public int LegacyLifetimeHighValueOreCount
+    {
+        set => LifetimeMythicOreCount = Math.Max(LifetimeMythicOreCount, value);
+    }
 
     [JsonPropertyName("lastMiningShip")]
     public string LegacyLastMiningShip

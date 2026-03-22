@@ -88,7 +88,10 @@ public sealed class SettingsService : ISettingsService
         settings.CompactModeWindowHeight = NormalizeWindowDimension(settings.CompactModeWindowHeight);
         settings.LifetimeSignatureCount = Math.Max(0, settings.LifetimeSignatureCount);
         settings.LifetimeRockCount = Math.Max(0, settings.LifetimeRockCount);
-        settings.LifetimeHighValueOreCount = Math.Max(0, settings.LifetimeHighValueOreCount);
+        settings.LifetimeCommonOreCount = Math.Max(0, settings.LifetimeCommonOreCount);
+        settings.LifetimeRareOreCount = Math.Max(0, settings.LifetimeRareOreCount);
+        settings.LifetimeLegendaryOreCount = Math.Max(0, settings.LifetimeLegendaryOreCount);
+        settings.LifetimeMythicOreCount = Math.Max(0, settings.LifetimeMythicOreCount);
 
         return settings;
     }

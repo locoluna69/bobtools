@@ -107,8 +107,14 @@
                                     <ColumnDefinition Width="10" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="10" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
 
-                                <Border Grid.Column="0"
+                                <Border Grid.Row="0"
+                                    Grid.Column="0"
                                         Padding="10"
                                         CornerRadius="10"
                                         BorderThickness="1"
@@ -123,7 +129,8 @@
                                     </StackPanel>
                                 </Border>
 
-                                <Border Grid.Column="2"
+                                <Border Grid.Row="0"
+                                    Grid.Column="2"
                                         Padding="10"
                                         CornerRadius="10"
                                         BorderThickness="1"
@@ -138,18 +145,67 @@
                                     </StackPanel>
                                 </Border>
 
-                                <Border Grid.Column="4"
+                                <Border Grid.Row="0"
+                                    Grid.Column="4"
+                                        Padding="10"
+                                        CornerRadius="10"
+                                        BorderThickness="1"
+                                        BorderBrush="#475569"
+                                        Background="#66111B2E"
+                                        ToolTip="Total ore entries found with quality scores from 0 through 749 across all sessions.">
+                                    <StackPanel>
+                                        <Rectangle Height="3" RadiusX="1.5" RadiusY="1.5" Fill="#64748B" HorizontalAlignment="Stretch" />
+                                        <TextBlock Margin="0,8,0,0" Foreground="#CBD5E1" FontSize="11" FontWeight="SemiBold" Text="COMMON" />
+                                        <TextBlock Margin="0,4,0,0" Foreground="White" FontSize="24" FontWeight="Bold" Text="{Binding LifetimeCommonOreCount}" />
+                                        <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" FontSize="10" Text="Ore scores 0-749" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Grid.Row="2"
+                                    Grid.Column="0"
+                                        Padding="10"
+                                        CornerRadius="10"
+                                        BorderThickness="1"
+                                        BorderBrush="#2563EB"
+                                        Background="#66111F3A"
+                                        ToolTip="Total ore entries found with quality scores from 750 through 800 across all sessions.">
+                                    <StackPanel>
+                                        <Rectangle Height="3" RadiusX="1.5" RadiusY="1.5" Fill="#60A5FA" HorizontalAlignment="Stretch" />
+                                        <TextBlock Margin="0,8,0,0" Foreground="#BFDBFE" FontSize="11" FontWeight="SemiBold" Text="RARE" />
+                                        <TextBlock Margin="0,4,0,0" Foreground="White" FontSize="24" FontWeight="Bold" Text="{Binding LifetimeRareOreCount}" />
+                                        <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" FontSize="10" Text="Ore scores 750-800" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Grid.Row="2"
+                                    Grid.Column="2"
                                         Padding="10"
                                         CornerRadius="10"
                                         BorderThickness="1"
                                         BorderBrush="#B45309"
                                         Background="#6623130B"
-                                        ToolTip="Total ore entries found with quality greater than or equal to 900 across all sessions.">
+                                        ToolTip="Total ore entries found with quality scores from 801 through 899 across all sessions.">
                                     <StackPanel>
                                         <Rectangle Height="3" RadiusX="1.5" RadiusY="1.5" Fill="#F59E0B" HorizontalAlignment="Stretch" />
-                                        <TextBlock Margin="0,8,0,0" Foreground="#FCD34D" FontSize="11" FontWeight="SemiBold" Text="HIGH QUALITY" />
-                                        <TextBlock Margin="0,4,0,0" Foreground="White" FontSize="24" FontWeight="Bold" Text="{Binding LifetimeHighValueOreCount}" />
-                                        <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" FontSize="10" Text="Ore entries at 900+" />
+                                        <TextBlock Margin="0,8,0,0" Foreground="#FCD34D" FontSize="11" FontWeight="SemiBold" Text="LEGENDARY" />
+                                        <TextBlock Margin="0,4,0,0" Foreground="White" FontSize="24" FontWeight="Bold" Text="{Binding LifetimeLegendaryOreCount}" />
+                                        <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" FontSize="10" Text="Ore scores 801-899" />
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Grid.Row="2"
+                                    Grid.Column="4"
+                                        Padding="10"
+                                        CornerRadius="10"
+                                        BorderThickness="1"
+                                        BorderBrush="#DC2626"
+                                        Background="#66351515"
+                                        ToolTip="Total ore entries found with quality scores from 900 through 999 across all sessions.">
+                                    <StackPanel>
+                                        <Rectangle Height="3" RadiusX="1.5" RadiusY="1.5" Fill="#EF4444" HorizontalAlignment="Stretch" />
+                                        <TextBlock Margin="0,8,0,0" Foreground="#FCA5A5" FontSize="11" FontWeight="SemiBold" Text="MYTHIC" />
+                                        <TextBlock Margin="0,4,0,0" Foreground="White" FontSize="24" FontWeight="Bold" Text="{Binding LifetimeMythicOreCount}" />
+                                        <TextBlock Margin="0,2,0,0" Foreground="#94A3B8" FontSize="10" Text="Ore scores 900-999" />
                                     </StackPanel>
                                 </Border>
                             </Grid>
@@ -969,8 +1025,6 @@
                                                                   Background="#0F172A"
                                                                   Foreground="#E5E7EB"
                                                                   BorderBrush="#334155"
-                                                                  RowBackground="#0F172A"
-                                                                  AlternatingRowBackground="#111827"
                                                                   GridLinesVisibility="Horizontal"
                                                                   HorizontalGridLinesBrush="#334155"
                                                                   VerticalGridLinesBrush="#334155"
@@ -984,9 +1038,31 @@
                                                                     <Setter Property="FontWeight" Value="SemiBold" />
                                                                     <Setter Property="Padding" Value="8,6" />
                                                                 </Style>
-                                                                <Style TargetType="DataGridCell">
+                                                                <Style x:Key="LiveMiningRowStyle" TargetType="DataGridRow">
                                                                     <Setter Property="Background" Value="#0F172A" />
                                                                     <Setter Property="Foreground" Value="#E5E7EB" />
+                                                                    <Setter Property="BorderBrush" Value="#334155" />
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding QualityTierKey}" Value="Rare">
+                                                                            <Setter Property="Background" Value="#0B2545" />
+                                                                            <Setter Property="Foreground" Value="#DBEAFE" />
+                                                                            <Setter Property="BorderBrush" Value="#60A5FA" />
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding QualityTierKey}" Value="Legendary">
+                                                                            <Setter Property="Background" Value="#3F2A00" />
+                                                                            <Setter Property="Foreground" Value="#FDE68A" />
+                                                                            <Setter Property="BorderBrush" Value="#F59E0B" />
+                                                                        </DataTrigger>
+                                                                        <DataTrigger Binding="{Binding QualityTierKey}" Value="Mythic">
+                                                                            <Setter Property="Background" Value="#3F1212" />
+                                                                            <Setter Property="Foreground" Value="#FECACA" />
+                                                                            <Setter Property="BorderBrush" Value="#EF4444" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                                <Style x:Key="LiveMiningCellStyle" TargetType="DataGridCell">
+                                                                    <Setter Property="Background" Value="Transparent" />
+                                                                    <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=DataGridRow}}" />
                                                                     <Setter Property="BorderBrush" Value="#334155" />
                                                                     <Setter Property="BorderThickness" Value="0,0,0,1" />
                                                                     <Setter Property="Padding" Value="6,4" />
@@ -999,7 +1075,7 @@
                                                                     </Style.Triggers>
                                                                 </Style>
                                                                 <Style x:Key="LiveGridTextBlockStyle" TargetType="TextBlock">
-                                                                    <Setter Property="Foreground" Value="#E5E7EB" />
+                                                                    <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=DataGridRow}}" />
                                                                     <Setter Property="VerticalAlignment" Value="Center" />
                                                                 </Style>
                                                                 <Style x:Key="LiveGridEditingTextBoxStyle" TargetType="TextBox">
@@ -1012,6 +1088,12 @@
                                                                     <Setter Property="SelectionBrush" Value="#2563EB" />
                                                                 </Style>
                                                             </DataGrid.Resources>
+                                                            <DataGrid.RowStyle>
+                                                                <StaticResource ResourceKey="LiveMiningRowStyle" />
+                                                            </DataGrid.RowStyle>
+                                                            <DataGrid.CellStyle>
+                                                                <StaticResource ResourceKey="LiveMiningCellStyle" />
+                                                            </DataGrid.CellStyle>
                                                             <DataGrid.Columns>
                                                                 <DataGridTextColumn Header="Element"
                                                                                     Binding="{Binding Element, UpdateSourceTrigger=PropertyChanged}"
@@ -1607,8 +1689,6 @@
                                                                               Background="#0F172A"
                                                                               Foreground="#E5E7EB"
                                                                               BorderBrush="#334155"
-                                                                              RowBackground="#0F172A"
-                                                                              AlternatingRowBackground="#111827"
                                                                               GridLinesVisibility="Horizontal"
                                                                               HorizontalGridLinesBrush="#334155"
                                                                               VerticalGridLinesBrush="#334155"
@@ -1622,9 +1702,31 @@
                                                                                 <Setter Property="FontWeight" Value="SemiBold" />
                                                                                 <Setter Property="Padding" Value="8,6" />
                                                                             </Style>
-                                                                            <Style TargetType="DataGridCell">
+                                                                            <Style x:Key="OfflineMiningRowStyle" TargetType="DataGridRow">
                                                                                 <Setter Property="Background" Value="#0F172A" />
                                                                                 <Setter Property="Foreground" Value="#E5E7EB" />
+                                                                                <Setter Property="BorderBrush" Value="#334155" />
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding QualityTierKey}" Value="Rare">
+                                                                                        <Setter Property="Background" Value="#0B2545" />
+                                                                                        <Setter Property="Foreground" Value="#DBEAFE" />
+                                                                                        <Setter Property="BorderBrush" Value="#60A5FA" />
+                                                                                    </DataTrigger>
+                                                                                    <DataTrigger Binding="{Binding QualityTierKey}" Value="Legendary">
+                                                                                        <Setter Property="Background" Value="#3F2A00" />
+                                                                                        <Setter Property="Foreground" Value="#FDE68A" />
+                                                                                        <Setter Property="BorderBrush" Value="#F59E0B" />
+                                                                                    </DataTrigger>
+                                                                                    <DataTrigger Binding="{Binding QualityTierKey}" Value="Mythic">
+                                                                                        <Setter Property="Background" Value="#3F1212" />
+                                                                                        <Setter Property="Foreground" Value="#FECACA" />
+                                                                                        <Setter Property="BorderBrush" Value="#EF4444" />
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                            <Style x:Key="OfflineMiningCellStyle" TargetType="DataGridCell">
+                                                                                <Setter Property="Background" Value="Transparent" />
+                                                                                <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=DataGridRow}}" />
                                                                                 <Setter Property="BorderBrush" Value="#334155" />
                                                                                 <Setter Property="BorderThickness" Value="0,0,0,1" />
                                                                                 <Setter Property="Padding" Value="6,4" />
@@ -1637,7 +1739,7 @@
                                                                                 </Style.Triggers>
                                                                             </Style>
                                                                             <Style x:Key="OfflineGridTextBlockStyle" TargetType="TextBlock">
-                                                                                <Setter Property="Foreground" Value="#E5E7EB" />
+                                                                                <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=DataGridRow}}" />
                                                                                 <Setter Property="VerticalAlignment" Value="Center" />
                                                                             </Style>
                                                                             <Style x:Key="OfflineGridEditingTextBoxStyle" TargetType="TextBox">
@@ -1650,6 +1752,12 @@
                                                                                 <Setter Property="SelectionBrush" Value="#2563EB" />
                                                                             </Style>
                                                                         </DataGrid.Resources>
+                                                                        <DataGrid.RowStyle>
+                                                                            <StaticResource ResourceKey="OfflineMiningRowStyle" />
+                                                                        </DataGrid.RowStyle>
+                                                                        <DataGrid.CellStyle>
+                                                                            <StaticResource ResourceKey="OfflineMiningCellStyle" />
+                                                                        </DataGrid.CellStyle>
                                                                         <DataGrid.Columns>
                                                                             <DataGridTextColumn Header="Element"
                                                                                                 Binding="{Binding Element, UpdateSourceTrigger=PropertyChanged}"
@@ -2052,23 +2160,11 @@
                                             <Border Margin="0,0,6,6"
                                                     Padding="6,3"
                                                     CornerRadius="999"
-                                                    Background="#052E2B"
-                                                    BorderBrush="#0F766E"
+                                                    Background="{Binding BackgroundBrush}"
+                                                    BorderBrush="{Binding BorderBrush}"
                                                     BorderThickness="1">
-                                                <Border.Style>
-                                                    <Style TargetType="Border">
-                                                        <Setter Property="Background" Value="#052E2B" />
-                                                        <Setter Property="BorderBrush" Value="#0F766E" />
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding IsHighlighted}" Value="True">
-                                                                <Setter Property="Background" Value="#3F3A2200" />
-                                                                <Setter Property="BorderBrush" Value="#F59E0B" />
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </Border.Style>
                                                 <TextBlock FontSize="10"
-                                                           Foreground="#D1FAE5"
+                                                           Foreground="{Binding ForegroundBrush}"
                                                            Text="{Binding DisplayText}" />
                                             </Border>
                                         </DataTemplate>
@@ -2077,7 +2173,7 @@
                                 <TextBlock Margin="0,2,0,0"
                                            Foreground="#94A3B8"
                                            FontSize="10"
-                                           Text="Highest quality ore is accented when quality values are available.">
+                                           Text="Rare, Legendary, and Mythic ores are color-coded by quality score.">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="Visibility" Value="Collapsed" />

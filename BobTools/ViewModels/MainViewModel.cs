@@ -68,7 +68,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string liveMiningQueueSummary = "No live mining captures yet.";
     [ObservableProperty] private int lifetimeSignatureCount;
     [ObservableProperty] private int lifetimeRockCount;
-    [ObservableProperty] private int lifetimeHighValueOreCount;
+    [ObservableProperty] private int lifetimeCommonOreCount;
+    [ObservableProperty] private int lifetimeRareOreCount;
+    [ObservableProperty] private int lifetimeLegendaryOreCount;
+    [ObservableProperty] private int lifetimeMythicOreCount;
     [ObservableProperty] private string selectedWorkflowMode = WorkflowModeCatalog.Scanning;
     [ObservableProperty] private string selectedCaptureProfile = CaptureProfileCatalog.Signature;
     [ObservableProperty] private bool captureOnlyMode;
@@ -215,7 +218,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
         isCompactMode = false;
         lifetimeSignatureCount = _settings.LifetimeSignatureCount;
         lifetimeRockCount = _settings.LifetimeRockCount;
-        lifetimeHighValueOreCount = _settings.LifetimeHighValueOreCount;
+        lifetimeCommonOreCount = _settings.LifetimeCommonOreCount;
+        lifetimeRareOreCount = _settings.LifetimeRareOreCount;
+        lifetimeLegendaryOreCount = _settings.LifetimeLegendaryOreCount;
+        lifetimeMythicOreCount = _settings.LifetimeMythicOreCount;
         selectedOcrMode = OcrModeCatalog.Auto;
         selectedWorkflowMode = WorkflowModeCatalog.Scanning;
         selectedCaptureProfile = CaptureProfileCatalog.Signature;
@@ -3621,16 +3627,24 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void IncrementMiningStats(RockScan rockScan)
     {
+        var tierCounts = CountQualityTiers(rockScan);
+
         LifetimeRockCount++;
-        LifetimeHighValueOreCount += CountHighValueOres(rockScan);
+        LifetimeCommonOreCount += tierCounts.CommonCount;
+        LifetimeRareOreCount += tierCounts.RareCount;
+        LifetimeLegendaryOreCount += tierCounts.LegendaryCount;
+        LifetimeMythicOreCount += tierCounts.MythicCount;
         _settings.LifetimeRockCount = LifetimeRockCount;
-        _settings.LifetimeHighValueOreCount = LifetimeHighValueOreCount;
+        _settings.LifetimeCommonOreCount = LifetimeCommonOreCount;
+        _settings.LifetimeRareOreCount = LifetimeRareOreCount;
+        _settings.LifetimeLegendaryOreCount = LifetimeLegendaryOreCount;
+        _settings.LifetimeMythicOreCount = LifetimeMythicOreCount;
         _settingsService.Save(_settings);
     }
 
-    private static int CountHighValueOres(RockScan rockScan)
+    private static OreQualityBreakdown CountQualityTiers(RockScan rockScan)
     {
-        return rockScan.Elements.Count(element => element.Quality is >= 900);
+        return OreQualityTierCatalog.CountTiers(rockScan.Elements);
     }
 
     private (string Summary, string? CsvPath, string? JsonPath, RockScan? CompletedScan) AppendMiningRockScanIfApplicable(string captureProfile, string? normalizedText, string sourceType, string? sourceImagePath, string? debugOutputDirectory)
