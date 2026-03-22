@@ -16,6 +16,7 @@
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.16" />
     <PackageReference Include="Tesseract" Version="5.2.0" />
   </ItemGroup>
 
@@ -24,6 +25,10 @@
     <EmbeddedResource Remove="Tools\SignatureDatasetExporter\**\*" />
     <None Remove="Tools\SignatureDatasetExporter\**\*" />
     <Page Remove="Tools\SignatureDatasetExporter\**\*" />
+    <Compile Remove="BobTools.Tests\**\*.cs" />
+    <EmbeddedResource Remove="BobTools.Tests\**\*" />
+    <None Remove="BobTools.Tests\**\*" />
+    <Page Remove="BobTools.Tests\**\*" />
   </ItemGroup>
 
   <ItemGroup>

@@ -22,59 +22,9 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
     private bool _suppressDirtyTracking;
     private bool _suppressAutoSave;
 
-    public OfflineMiningResultItem(
-        string sourceImagePath,
-        string? processedImagePath,
-        RockScan extractedScan,
-        string summary,
-        string? jsonPath,
-        string? csvPath,
-        Action<string>? statusCallback = null,
-        Action<OfflineMiningResultItem>? persistCallback = null,
-        string processingState = "Ready",
-        bool isProcessing = false,
-        bool enableAutoSave = false)
-    {
-        SourceImagePath = sourceImagePath;
-        DisplayName = Path.GetFileName(sourceImagePath);
-        SourcePreviewImage = LoadImage(sourceImagePath);
-        _statusCallback = statusCallback;
-        _persistCallback = persistCallback;
-        _enableAutoSave = enableAutoSave;
-        ExtractedScan = extractedScan;
-        this.processedImagePath = processedImagePath;
-        this.processedPreviewImage = LoadImage(processedImagePath);
-        LoadEditableValues(extractedScan);
-        this.summary = summary;
-        this.jsonPath = jsonPath;
-        this.csvPath = csvPath;
-        this.processingState = processingState;
-        this.isProcessing = isProcessing;
-        SaveCommand = new AsyncRelayCommand(SaveAsync, CanSave);
-        AddRowCommand = new RelayCommand(AddRow, CanAddRow);
-        DeleteRowCommand = new RelayCommand<OfflineMiningElementEditRow>(DeleteRow);
-        _savedSnapshot = BuildSnapshot();
-    }
-
-    public string DisplayName { get; }
-
-    public string SourceImagePath { get; }
-
-    public ImageSource? SourcePreviewImage { get; }
-
-    public ImageSource? DisplayPreviewImage => SourcePreviewImage ?? ProcessedPreviewImage;
-
-    public IAsyncRelayCommand SaveCommand { get; }
-
-    public IRelayCommand AddRowCommand { get; }
-
-    public IRelayCommand<OfflineMiningElementEditRow> DeleteRowCommand { get; }
-
+    [ObservableProperty] private ImageSource? sourcePreviewImage;
     [ObservableProperty] private string? processedImagePath;
     [ObservableProperty] private ImageSource? processedPreviewImage;
-
-    public RockScan ExtractedScan { get; private set; }
-
     [ObservableProperty] private string editableMaterial = string.Empty;
     [ObservableProperty] private string editableMass = string.Empty;
     [ObservableProperty] private string editableResistance = string.Empty;
@@ -96,6 +46,52 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
     [ObservableProperty] private string reviewStatus = ScanReviewCatalog.Pending;
     [ObservableProperty] private DateTime? exportedAtUtc;
     [ObservableProperty] private string exportBatchId = string.Empty;
+
+    public OfflineMiningResultItem(
+        string sourceImagePath,
+        string? processedImagePath,
+        RockScan extractedScan,
+        string summary,
+        string? jsonPath,
+        string? csvPath,
+        Action<string>? statusCallback = null,
+        Action<OfflineMiningResultItem>? persistCallback = null,
+        string processingState = "Ready",
+        bool isProcessing = false,
+        bool enableAutoSave = false)
+    {
+        SourceImagePath = sourceImagePath;
+        DisplayName = Path.GetFileName(sourceImagePath);
+        _statusCallback = statusCallback;
+        _persistCallback = persistCallback;
+        _enableAutoSave = enableAutoSave;
+        ExtractedScan = extractedScan;
+        this.processedImagePath = processedImagePath;
+        LoadEditableValues(extractedScan);
+        this.summary = summary;
+        this.jsonPath = jsonPath;
+        this.csvPath = csvPath;
+        this.processingState = processingState;
+        this.isProcessing = isProcessing;
+        SaveCommand = new AsyncRelayCommand(SaveAsync, CanSave);
+        AddRowCommand = new RelayCommand(AddRow, CanAddRow);
+        DeleteRowCommand = new RelayCommand<OfflineMiningElementEditRow>(DeleteRow);
+        _savedSnapshot = BuildSnapshot();
+    }
+
+    public string DisplayName { get; }
+
+    public string SourceImagePath { get; }
+
+    public ImageSource? DisplayPreviewImage => SourcePreviewImage ?? ProcessedPreviewImage;
+
+    public IAsyncRelayCommand SaveCommand { get; }
+
+    public IRelayCommand AddRowCommand { get; }
+
+    public IRelayCommand<OfflineMiningElementEditRow> DeleteRowCommand { get; }
+
+    public RockScan ExtractedScan { get; private set; }
 
     public string ImageZoomLabel => $"Zoom {Math.Round(ImageZoom * 100):0}%";
     public IReadOnlyList<string> ReviewStatusOptions => ScanReviewCatalog.Options;
@@ -222,6 +218,33 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
 
     public bool HasCompactOreItems => CompactOreItems.Count > 0;
 
+    public void LoadPreviewImages()
+    {
+        if (SourcePreviewImage is null)
+        {
+            SourcePreviewImage = LoadImage(SourceImagePath);
+        }
+
+        if (ProcessedPreviewImage is null && !string.IsNullOrWhiteSpace(ProcessedImagePath))
+        {
+            ProcessedPreviewImage = LoadImage(ProcessedImagePath);
+        }
+
+        OnPropertyChanged(nameof(DisplayPreviewImage));
+    }
+
+    public void ReleasePreviewImages()
+    {
+        if (SourcePreviewImage is null && ProcessedPreviewImage is null)
+        {
+            return;
+        }
+
+        SourcePreviewImage = null;
+        ProcessedPreviewImage = null;
+        OnPropertyChanged(nameof(DisplayPreviewImage));
+    }
+
     public void ApplySelectedTargetResources(IEnumerable<string>? resources)
     {
         SelectedTargetResources = resources?
@@ -291,7 +314,7 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
     {
         ExtractedScan = processedScan;
         ProcessedImagePath = processedImageFilePath;
-        ProcessedPreviewImage = LoadImage(processedImageFilePath);
+        ProcessedPreviewImage = null;
         LoadEditableValues(processedScan);
         Summary = processedSummary;
         UsedOcrModeSummary = usedOcrModeSummary;
@@ -306,6 +329,12 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
         {
             AutoSaveStatus = "Saved";
         }
+
+        if (SourcePreviewImage is not null || ProcessedPreviewImage is not null)
+        {
+            LoadPreviewImages();
+        }
+
         OnPropertyChanged(nameof(DisplayPreviewImage));
         OnCompactDisplayChanged();
     }
@@ -390,6 +419,12 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
     partial void OnImageZoomChanged(double value)
     {
         OnPropertyChanged(nameof(ImageZoomLabel));
+    }
+
+    partial void OnProcessedImagePathChanged(string? value)
+    {
+        ProcessedPreviewImage = null;
+        OnPropertyChanged(nameof(DisplayPreviewImage));
     }
 
     private void SubscribeToEditableElements(ObservableCollection<OfflineMiningElementEditRow> rows)

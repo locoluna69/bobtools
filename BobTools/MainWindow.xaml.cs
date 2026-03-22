@@ -39,14 +39,17 @@ public partial class MainWindow : Window
 
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         var appData = Path.Combine(localAppData, "BobTools");
+        var databasePath = Path.Combine(appData, "bobtools.db");
         var settingsPath = Path.Combine(appData, "settings.json");
         var tessDataPath = Path.Combine(AppContext.BaseDirectory, "Assets", "tessdata");
 
         MigrateLegacySettings(localAppData, settingsPath);
 
         var settingsService = new SettingsService(settingsPath);
-        var sessionHistoryService = new SessionHistoryService(Path.Combine(appData, "Sessions"), App.SessionId);
-        var globalResultsStore = new GlobalResultsStore(Path.Combine(appData, "live-results.json"));
+        var legacySessionsPath = Path.Combine(appData, "Sessions");
+        var legacyLiveResultsPath = Path.Combine(appData, "live-results.json");
+        var sessionHistoryService = new SessionHistoryService(databasePath, legacySessionsPath, App.SessionId);
+        var globalResultsStore = new GlobalResultsStore(databasePath, legacyLiveResultsPath);
         sessionHistoryService.Initialize();
 
         _hotkeyService = new HotkeyService();

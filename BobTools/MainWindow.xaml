@@ -701,8 +701,46 @@
                                             </Popup>
                                         </StackPanel>
                                     </DockPanel>
-                                        <ItemsControl ItemsSource="{Binding LiveScanResultsView}">
-                                        <ItemsControl.ItemTemplate>
+                                    <DockPanel Margin="0,0,0,12" LastChildFill="False">
+                                        <TextBlock DockPanel.Dock="Left"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="#94A3B8"
+                                                   Text="{Binding LiveScanPageSummary}" />
+                                        <WrapPanel DockPanel.Dock="Right">
+                                            <Button Width="72"
+                                                    Margin="0,0,8,0"
+                                                    Content="Previous"
+                                                    Command="{Binding PreviousLiveScanPageCommand}" />
+                                            <Button Width="56"
+                                                    Content="Next"
+                                                    Command="{Binding NextLiveScanPageCommand}" />
+                                        </WrapPanel>
+                                    </DockPanel>
+                                    <ListBox ItemsSource="{Binding VisibleLiveScanResults}"
+                                             Background="Transparent"
+                                             BorderThickness="0"
+                                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                             ScrollViewer.CanContentScroll="True"
+                                             VirtualizingPanel.IsVirtualizing="True"
+                                             VirtualizingPanel.VirtualizationMode="Recycling">
+                                        <ListBox.ItemContainerStyle>
+                                            <Style TargetType="ListBoxItem">
+                                                <Setter Property="Padding" Value="0" />
+                                                <Setter Property="Margin" Value="0" />
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                <Setter Property="Background" Value="Transparent" />
+                                                <Setter Property="BorderThickness" Value="0" />
+                                                <Setter Property="Focusable" Value="False" />
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="ListBoxItem">
+                                                            <ContentPresenter />
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </ListBox.ItemContainerStyle>
+                                        <ListBox.ItemTemplate>
                                             <DataTemplate>
                                                 <Border Margin="0,0,0,12" Padding="12" CornerRadius="10" Background="#8A0F172A" BorderBrush="#334155" BorderThickness="1">
                                                     <Border.Style>
@@ -832,8 +870,8 @@
                                                     </Grid>
                                                 </Border>
                                             </DataTemplate>
-                                        </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
                                 </StackPanel>
 
                                 <StackPanel>
@@ -912,8 +950,46 @@
                                             </Popup>
                                         </StackPanel>
                                     </DockPanel>
-                                    <ItemsControl ItemsSource="{Binding LiveMiningResultsView}">
-                                    <ItemsControl.ItemTemplate>
+                                    <DockPanel Margin="0,0,0,12" LastChildFill="False">
+                                        <TextBlock DockPanel.Dock="Left"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="#94A3B8"
+                                                   Text="{Binding LiveMiningPageSummary}" />
+                                        <WrapPanel DockPanel.Dock="Right">
+                                            <Button Width="72"
+                                                    Margin="0,0,8,0"
+                                                    Content="Previous"
+                                                    Command="{Binding PreviousLiveMiningPageCommand}" />
+                                            <Button Width="56"
+                                                    Content="Next"
+                                                    Command="{Binding NextLiveMiningPageCommand}" />
+                                        </WrapPanel>
+                                    </DockPanel>
+                                    <ListBox ItemsSource="{Binding VisibleLiveMiningResults}"
+                                             Background="Transparent"
+                                             BorderThickness="0"
+                                             ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                             ScrollViewer.CanContentScroll="True"
+                                             VirtualizingPanel.IsVirtualizing="True"
+                                             VirtualizingPanel.VirtualizationMode="Recycling">
+                                    <ListBox.ItemContainerStyle>
+                                        <Style TargetType="ListBoxItem">
+                                            <Setter Property="Padding" Value="0" />
+                                            <Setter Property="Margin" Value="0" />
+                                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                            <Setter Property="Background" Value="Transparent" />
+                                            <Setter Property="BorderThickness" Value="0" />
+                                            <Setter Property="Focusable" Value="False" />
+                                            <Setter Property="Template">
+                                                <Setter.Value>
+                                                    <ControlTemplate TargetType="ListBoxItem">
+                                                        <ContentPresenter />
+                                                    </ControlTemplate>
+                                                </Setter.Value>
+                                            </Setter>
+                                        </Style>
+                                    </ListBox.ItemContainerStyle>
+                                    <ListBox.ItemTemplate>
                                         <DataTemplate>
                                             <Border Margin="0,0,0,12" Padding="12" CornerRadius="10" Background="#8A0F172A" BorderBrush="#334155" BorderThickness="1">
                                                 <Grid>
@@ -1126,8 +1202,8 @@
                                                 </Grid>
                                             </Border>
                                         </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                    </ItemsControl>
+                                    </ListBox.ItemTemplate>
+                                    </ListBox>
                                 </StackPanel>
 
                                 <TextBlock Foreground="#94A3B8" TextWrapping="Wrap" Text="Offline mode does not create live capture history entries. Use Queue Folder to import mining screenshots.">

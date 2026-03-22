@@ -17,6 +17,25 @@ public sealed partial class LiveScanResultItem : ObservableObject
     private readonly Action<string>? _statusCallback;
     private bool _suppressPersistence;
 
+    [ObservableProperty] private ImageSource? sourcePreviewImage;
+    [ObservableProperty] private string? processedImagePath;
+    [ObservableProperty] private ImageSource? processedPreviewImage;
+    [ObservableProperty] private string processingState = string.Empty;
+    [ObservableProperty] private bool isProcessing;
+    [ObservableProperty] private string ocrText = string.Empty;
+    [ObservableProperty] private string correctValue = string.Empty;
+    [ObservableProperty] private string signatureResourceSummary = "Scan resource: none yet";
+    [ObservableProperty] private string usedOcrModeSummary = string.Empty;
+    [ObservableProperty] private string ocrSourceSummary = string.Empty;
+    [ObservableProperty] private string? matchedResourceName;
+    [ObservableProperty] private bool isTargetMatch;
+    [ObservableProperty] private List<string> selectedTargets = [];
+    [ObservableProperty] private string autoSaveStatus = string.Empty;
+    [ObservableProperty] private double imageZoom = 1d;
+    [ObservableProperty] private string reviewStatus = ScanReviewCatalog.Pending;
+    [ObservableProperty] private DateTime? exportedAtUtc;
+    [ObservableProperty] private string exportBatchId = string.Empty;
+
     public LiveScanResultItem(
         string historyEntryId,
         string sessionId,
@@ -35,11 +54,9 @@ public sealed partial class LiveScanResultItem : ObservableObject
         SourceImagePath = sourceImagePath;
         DebugFolderPath = debugFolderPath;
         DisplayName = Path.GetFileName(sourceImagePath);
-        SourcePreviewImage = LoadImage(sourceImagePath);
         _persistCallback = persistCallback;
         _statusCallback = statusCallback;
         this.processedImagePath = processedImagePath;
-        this.processedPreviewImage = LoadImage(processedImagePath);
         this.processingState = processingState;
         this.isProcessing = isProcessing;
     }
@@ -56,27 +73,7 @@ public sealed partial class LiveScanResultItem : ObservableObject
 
     public string? DebugFolderPath { get; }
 
-    public ImageSource? SourcePreviewImage { get; }
-
     public ImageSource? DisplayPreviewImage => SourcePreviewImage ?? ProcessedPreviewImage;
-
-    [ObservableProperty] private string? processedImagePath;
-    [ObservableProperty] private ImageSource? processedPreviewImage;
-    [ObservableProperty] private string processingState = string.Empty;
-    [ObservableProperty] private bool isProcessing;
-    [ObservableProperty] private string ocrText = string.Empty;
-    [ObservableProperty] private string correctValue = string.Empty;
-    [ObservableProperty] private string signatureResourceSummary = "Scan resource: none yet";
-    [ObservableProperty] private string usedOcrModeSummary = string.Empty;
-    [ObservableProperty] private string ocrSourceSummary = string.Empty;
-    [ObservableProperty] private string? matchedResourceName;
-    [ObservableProperty] private bool isTargetMatch;
-    [ObservableProperty] private List<string> selectedTargets = [];
-    [ObservableProperty] private string autoSaveStatus = string.Empty;
-    [ObservableProperty] private double imageZoom = 1d;
-    [ObservableProperty] private string reviewStatus = ScanReviewCatalog.Pending;
-    [ObservableProperty] private DateTime? exportedAtUtc;
-    [ObservableProperty] private string exportBatchId = string.Empty;
 
     public string ImageZoomLabel => $"Zoom {Math.Round(ImageZoom * 100):0}%";
     public IReadOnlyList<string> ReviewStatusOptions => ScanReviewCatalog.Options;
@@ -142,6 +139,33 @@ public sealed partial class LiveScanResultItem : ObservableObject
         }
     }
 
+    public void LoadPreviewImages()
+    {
+        if (SourcePreviewImage is null)
+        {
+            SourcePreviewImage = LoadImage(SourceImagePath);
+        }
+
+        if (ProcessedPreviewImage is null && !string.IsNullOrWhiteSpace(ProcessedImagePath))
+        {
+            ProcessedPreviewImage = LoadImage(ProcessedImagePath);
+        }
+
+        OnPropertyChanged(nameof(DisplayPreviewImage));
+    }
+
+    public void ReleasePreviewImages()
+    {
+        if (SourcePreviewImage is null && ProcessedPreviewImage is null)
+        {
+            return;
+        }
+
+        SourcePreviewImage = null;
+        ProcessedPreviewImage = null;
+        OnPropertyChanged(nameof(DisplayPreviewImage));
+    }
+
     public void SetProcessingState(string state, bool value)
     {
         ProcessingState = state;
@@ -171,12 +195,18 @@ public sealed partial class LiveScanResultItem : ObservableObject
         IsTargetMatch = isMatchingTarget;
         SelectedTargets = selectedTargets?.Where(target => !string.IsNullOrWhiteSpace(target)).ToList() ?? [];
         ProcessedImagePath = processedImageFilePath;
-        ProcessedPreviewImage = LoadImage(processedImageFilePath);
+        ProcessedPreviewImage = null;
         ProcessingState = processingState;
         IsProcessing = false;
         _lastPersistedCorrectValue = CorrectValue ?? string.Empty;
         AutoSaveStatus = string.IsNullOrWhiteSpace(CorrectValue) ? string.Empty : "Saved";
         _suppressPersistence = false;
+
+        if (SourcePreviewImage is not null || ProcessedPreviewImage is not null)
+        {
+            LoadPreviewImages();
+        }
+
         OnPropertyChanged(nameof(DisplayPreviewImage));
         OnCompactDisplayChanged();
     }
@@ -222,6 +252,12 @@ public sealed partial class LiveScanResultItem : ObservableObject
     partial void OnImageZoomChanged(double value)
     {
         OnPropertyChanged(nameof(ImageZoomLabel));
+    }
+
+    partial void OnProcessedImagePathChanged(string? value)
+    {
+        ProcessedPreviewImage = null;
+        OnPropertyChanged(nameof(DisplayPreviewImage));
     }
 
     partial void OnReviewStatusChanged(string value)
@@ -406,6 +442,7 @@ public sealed partial class LiveScanResultItem : ObservableObject
         bitmap.Freeze();
         return bitmap;
     }
+
     private void OnCompactDisplayChanged()
     {
         OnPropertyChanged(nameof(CompactPrimaryValue));

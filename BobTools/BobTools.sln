@@ -4,6 +4,8 @@ VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BobTools", "BobTools.csproj", "{B2D1F5B3-9479-6F11-852E-F4122EFB0066}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BobTools.Tests", "BobTools.Tests\BobTools.Tests.csproj", "{0A73A39A-511C-4E80-B1B2-42516FF5B0EE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -14,6 +16,10 @@ Global
 		{B2D1F5B3-9479-6F11-852E-F4122EFB0066}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B2D1F5B3-9479-6F11-852E-F4122EFB0066}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B2D1F5B3-9479-6F11-852E-F4122EFB0066}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0A73A39A-511C-4E80-B1B2-42516FF5B0EE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0A73A39A-511C-4E80-B1B2-42516FF5B0EE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0A73A39A-511C-4E80-B1B2-42516FF5B0EE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0A73A39A-511C-4E80-B1B2-42516FF5B0EE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

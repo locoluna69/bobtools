@@ -46,10 +46,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private bool _isUpdatingScanTargetSelection;
     private bool _isUpdatingLiveScanReviewFilterSelection;
     private bool _isUpdatingLiveMiningReviewFilterSelection;
+    private bool _isLoadingPersistedLiveResults;
     private bool _isSyncingOfflineScanSelection;
     private CancellationTokenSource? _sessionProfileImageCancellation;
     private int _sessionProfileImageRequestVersion;
     private const string ExportedReviewFilterKey = "Exported";
+    private const int LiveResultsPageSize = 25;
 
     [ObservableProperty] private string status = "Ready.";
     [ObservableProperty] private string acceptedText = string.Empty;
@@ -115,6 +117,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string selectedLiveMiningReviewFilterSummary = "Review filter: all";
     [ObservableProperty] private string scanTrainingDatasetSummary = "Scan dataset: 0 total | 0 pending | 0 reviewed | 0 exported | 0 rejected";
     [ObservableProperty] private string miningReviewDatasetSummary = "Mining dataset: 0 total | 0 pending | 0 reviewed | 0 rejected";
+    [ObservableProperty] private int liveScanCurrentPage = 1;
+    [ObservableProperty] private int liveScanTotalPages = 1;
+    [ObservableProperty] private string liveScanPageSummary = "Showing 0 of 0";
+    [ObservableProperty] private int liveMiningCurrentPage = 1;
+    [ObservableProperty] private int liveMiningTotalPages = 1;
+    [ObservableProperty] private string liveMiningPageSummary = "Showing 0 of 0";
     [ObservableProperty] private double offlinePreviewWidth = 640;
     [ObservableProperty] private double offlinePreviewHeight = 280;
     [ObservableProperty] private double offlineSelectionLeft;
@@ -159,6 +167,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public IRelayCommand ClearLiveScanReviewFiltersCommand { get; }
     public IRelayCommand SelectAllLiveMiningReviewFiltersCommand { get; }
     public IRelayCommand ClearLiveMiningReviewFiltersCommand { get; }
+    public IRelayCommand PreviousLiveScanPageCommand { get; }
+    public IRelayCommand NextLiveScanPageCommand { get; }
+    public IRelayCommand PreviousLiveMiningPageCommand { get; }
+    public IRelayCommand NextLiveMiningPageCommand { get; }
     public IReadOnlyList<OcrModeOption> OcrModeOptions { get; } = OcrModeCatalog.Options;
     public IReadOnlyList<CaptureProfileOption> WorkflowModeOptions { get; } = WorkflowModeCatalog.Options;
     public IReadOnlyList<CaptureProfileOption> CaptureProfileOptions { get; } = CaptureProfileCatalog.Options;
@@ -173,6 +185,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public ObservableCollection<MiningLocationOption> SessionLocationOptions { get; } = new();
     public ObservableCollection<LiveScanResultItem> LiveScanResults { get; } = new();
     public ObservableCollection<OfflineMiningResultItem> LiveMiningResults { get; } = new();
+    public ObservableCollection<LiveScanResultItem> VisibleLiveScanResults { get; } = new();
+    public ObservableCollection<OfflineMiningResultItem> VisibleLiveMiningResults { get; } = new();
     public ObservableCollection<ReviewFilterOption> LiveScanReviewFilterOptions { get; } = new();
     public ObservableCollection<ReviewFilterOption> LiveMiningReviewFilterOptions { get; } = new();
     public ICollectionView LiveScanResultsView => _liveScanResultsView;
@@ -199,6 +213,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public string CompactWorkflowToggleLabel => IsMiningMode ? "Switch To Scan" : "Switch To Mining";
     public string CompactModeBadgeLabel => IsMiningMode ? "MINING" : "SCAN";
     public string CompactModeSubtitle => IsMiningMode ? "Ore sweep and fracture stats" : "Signature sweep and target hits";
+    public bool CanGoToPreviousLiveScanPage => LiveScanCurrentPage > 1;
+    public bool CanGoToNextLiveScanPage => LiveScanCurrentPage < LiveScanTotalPages;
+    public bool CanGoToPreviousLiveMiningPage => LiveMiningCurrentPage > 1;
+    public bool CanGoToNextLiveMiningPage => LiveMiningCurrentPage < LiveMiningTotalPages;
 
     public MainViewModel(ISettingsService settingsService, ISessionHistoryService sessionHistoryService, IGlobalResultsStore globalResultsStore, IScreenCaptureService screenCaptureService, IOcrService ocrService, IRsiProfileImageService rsiProfileImageService)
     {
@@ -325,6 +343,10 @@ public partial class MainViewModel : ObservableObject, IDisposable
         ClearLiveScanReviewFiltersCommand = new RelayCommand(() => SetAllLiveScanReviewFilters(false));
         SelectAllLiveMiningReviewFiltersCommand = new RelayCommand(() => SetAllLiveMiningReviewFilters(true));
         ClearLiveMiningReviewFiltersCommand = new RelayCommand(() => SetAllLiveMiningReviewFilters(false));
+        PreviousLiveScanPageCommand = new RelayCommand(() => ChangeLiveScanPage(-1), () => CanGoToPreviousLiveScanPage);
+        NextLiveScanPageCommand = new RelayCommand(() => ChangeLiveScanPage(1), () => CanGoToNextLiveScanPage);
+        PreviousLiveMiningPageCommand = new RelayCommand(() => ChangeLiveMiningPage(-1), () => CanGoToPreviousLiveMiningPage);
+        NextLiveMiningPageCommand = new RelayCommand(() => ChangeLiveMiningPage(1), () => CanGoToNextLiveMiningPage);
         UpdateScanTrainingDatasetSummary();
         UpdateMiningReviewDatasetSummary();
     }
@@ -345,6 +367,18 @@ public partial class MainViewModel : ObservableObject, IDisposable
     {
         LatestLiveScanResult = LiveScanResults.FirstOrDefault();
         LatestLiveMiningResult = LiveMiningResults.FirstOrDefault();
+    }
+
+    private void ChangeLiveScanPage(int delta)
+    {
+        LiveScanCurrentPage = Math.Max(1, LiveScanCurrentPage + delta);
+        RefreshLiveScanResultsPage();
+    }
+
+    private void ChangeLiveMiningPage(int delta)
+    {
+        LiveMiningCurrentPage = Math.Max(1, LiveMiningCurrentPage + delta);
+        RefreshLiveMiningResultsPage();
     }
 
     private bool ShouldIncludeLiveScanResult(object item)
@@ -428,7 +462,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         UpdateCompactResults();
         UpdateScanTrainingDatasetSummary();
-        _liveScanResultsView.Refresh();
+        if (_isLoadingPersistedLiveResults)
+        {
+            return;
+        }
+
+        RefreshLiveScanResultsPage();
     }
 
     private void LiveScanResultItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -438,7 +477,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             or nameof(LiveScanResultItem.ExportBatchId))
         {
             UpdateScanTrainingDatasetSummary();
-            _liveScanResultsView.Refresh();
+            RefreshLiveScanResultsPage();
         }
     }
 
@@ -462,7 +501,12 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         UpdateCompactResults();
         UpdateMiningReviewDatasetSummary();
-        _liveMiningResultsView.Refresh();
+        if (_isLoadingPersistedLiveResults)
+        {
+            return;
+        }
+
+        RefreshLiveMiningResultsPage();
     }
 
     private void LiveMiningResultItem_PropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -472,7 +516,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             or nameof(OfflineMiningResultItem.ExportBatchId))
         {
             UpdateMiningReviewDatasetSummary();
-            _liveMiningResultsView.Refresh();
+            RefreshLiveMiningResultsPage();
         }
     }
 
@@ -966,8 +1010,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         UpdateSelectedLiveScanReviewFilterSummary();
         UpdateSelectedLiveMiningReviewFilterSummary();
-        _liveScanResultsView.Refresh();
-        _liveMiningResultsView.Refresh();
+        RefreshLiveScanResultsPage(resetPage: true);
+        RefreshLiveMiningResultsPage(resetPage: true);
     }
 
     private static void InitializeReviewFilterOptions(
@@ -992,7 +1036,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
 
         UpdateSelectedLiveScanReviewFilterSummary();
-        _liveScanResultsView.Refresh();
+        RefreshLiveScanResultsPage(resetPage: true);
     }
 
     private void LiveMiningReviewFilterOption_PropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -1003,7 +1047,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
 
         UpdateSelectedLiveMiningReviewFilterSummary();
-        _liveMiningResultsView.Refresh();
+        RefreshLiveMiningResultsPage(resetPage: true);
     }
 
     private void SetAllLiveScanReviewFilters(bool isSelected)
@@ -1022,7 +1066,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
 
         UpdateSelectedLiveScanReviewFilterSummary();
-        _liveScanResultsView.Refresh();
+        RefreshLiveScanResultsPage(resetPage: true);
     }
 
     private void SetAllLiveMiningReviewFilters(bool isSelected)
@@ -1041,7 +1085,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         }
 
         UpdateSelectedLiveMiningReviewFilterSummary();
-        _liveMiningResultsView.Refresh();
+        RefreshLiveMiningResultsPage(resetPage: true);
     }
 
     private void UpdateSelectedLiveScanReviewFilterSummary()
@@ -1189,6 +1233,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void LoadPersistedLiveResults()
     {
+        _isLoadingPersistedLiveResults = true;
         LiveScanResults.Clear();
         LiveMiningResults.Clear();
 
@@ -1223,6 +1268,9 @@ public partial class MainViewModel : ObservableObject, IDisposable
         UpdateLiveMiningTargetHighlights();
         UpdateLiveScanQueueSummary();
         UpdateLiveMiningQueueSummary();
+        _isLoadingPersistedLiveResults = false;
+        RefreshLiveScanResultsPage(resetPage: true);
+        RefreshLiveMiningResultsPage(resetPage: true);
     }
 
     private async Task ResumePendingLiveQueueEntriesAsync()
@@ -3094,7 +3142,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         UpdateLiveScanQueueSummary();
         UpdateScanTrainingDatasetSummary();
-        _liveScanResultsView.Refresh();
+        RefreshLiveScanResultsPage();
         Status = $"Purged {rejectedRecords.Count} rejected scan record(s); deleted {deletedFileCount} file(s) and {deletedFolderCount} folder(s).";
     }
 
@@ -3179,8 +3227,123 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         UpdateLiveMiningQueueSummary();
         UpdateMiningReviewDatasetSummary();
-        _liveMiningResultsView.Refresh();
+        RefreshLiveMiningResultsPage();
         Status = $"Purged {rejectedRecords.Count} rejected mining record(s); deleted {deletedFileCount} file(s) and {deletedFolderCount} folder(s).";
+    }
+
+    private void RefreshLiveScanResultsPage(bool resetPage = false)
+    {
+        _liveScanResultsView.Refresh();
+        var filteredItems = _liveScanResultsView.Cast<LiveScanResultItem>().ToList();
+        var totalPages = Math.Max(1, (int)Math.Ceiling(filteredItems.Count / (double)LiveResultsPageSize));
+        var currentPage = resetPage ? 1 : Math.Min(Math.Max(1, LiveScanCurrentPage), totalPages);
+        var pageItems = filteredItems
+            .Skip((currentPage - 1) * LiveResultsPageSize)
+            .Take(LiveResultsPageSize)
+            .ToList();
+
+        ReplaceVisibleResults(VisibleLiveScanResults, pageItems);
+        UpdateLiveScanPreviewCache(pageItems);
+
+        LiveScanCurrentPage = currentPage;
+        LiveScanTotalPages = totalPages;
+        LiveScanPageSummary = filteredItems.Count == 0
+            ? "Showing 0 of 0"
+            : $"Showing {((currentPage - 1) * LiveResultsPageSize) + 1}-{((currentPage - 1) * LiveResultsPageSize) + pageItems.Count} of {filteredItems.Count}";
+        NotifyLiveScanPagingChanged();
+    }
+
+    private void RefreshLiveMiningResultsPage(bool resetPage = false)
+    {
+        _liveMiningResultsView.Refresh();
+        var filteredItems = _liveMiningResultsView.Cast<OfflineMiningResultItem>().ToList();
+        var totalPages = Math.Max(1, (int)Math.Ceiling(filteredItems.Count / (double)LiveResultsPageSize));
+        var currentPage = resetPage ? 1 : Math.Min(Math.Max(1, LiveMiningCurrentPage), totalPages);
+        var pageItems = filteredItems
+            .Skip((currentPage - 1) * LiveResultsPageSize)
+            .Take(LiveResultsPageSize)
+            .ToList();
+
+        ReplaceVisibleResults(VisibleLiveMiningResults, pageItems);
+        UpdateLiveMiningPreviewCache(pageItems);
+
+        LiveMiningCurrentPage = currentPage;
+        LiveMiningTotalPages = totalPages;
+        LiveMiningPageSummary = filteredItems.Count == 0
+            ? "Showing 0 of 0"
+            : $"Showing {((currentPage - 1) * LiveResultsPageSize) + 1}-{((currentPage - 1) * LiveResultsPageSize) + pageItems.Count} of {filteredItems.Count}";
+        NotifyLiveMiningPagingChanged();
+    }
+
+    private static void ReplaceVisibleResults<T>(ObservableCollection<T> target, IReadOnlyList<T> items)
+    {
+        target.Clear();
+        foreach (var item in items)
+        {
+            target.Add(item);
+        }
+    }
+
+    private void UpdateLiveScanPreviewCache(IReadOnlyCollection<LiveScanResultItem> visibleItems)
+    {
+        var visibleSet = new HashSet<LiveScanResultItem>(visibleItems);
+        foreach (var item in LiveScanResults)
+        {
+            if (visibleSet.Contains(item))
+            {
+                item.LoadPreviewImages();
+            }
+            else
+            {
+                item.ReleasePreviewImages();
+            }
+        }
+    }
+
+    private void UpdateLiveMiningPreviewCache(IReadOnlyCollection<OfflineMiningResultItem> visibleItems)
+    {
+        var visibleSet = new HashSet<OfflineMiningResultItem>(visibleItems);
+        foreach (var item in LiveMiningResults)
+        {
+            if (visibleSet.Contains(item))
+            {
+                item.LoadPreviewImages();
+            }
+            else
+            {
+                item.ReleasePreviewImages();
+            }
+        }
+    }
+
+    private void NotifyLiveScanPagingChanged()
+    {
+        OnPropertyChanged(nameof(CanGoToPreviousLiveScanPage));
+        OnPropertyChanged(nameof(CanGoToNextLiveScanPage));
+        if (PreviousLiveScanPageCommand is not null)
+        {
+            PreviousLiveScanPageCommand.NotifyCanExecuteChanged();
+        }
+
+        if (NextLiveScanPageCommand is not null)
+        {
+            NextLiveScanPageCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    private void NotifyLiveMiningPagingChanged()
+    {
+        OnPropertyChanged(nameof(CanGoToPreviousLiveMiningPage));
+        OnPropertyChanged(nameof(CanGoToNextLiveMiningPage));
+        if (PreviousLiveMiningPageCommand is not null)
+        {
+            PreviousLiveMiningPageCommand.NotifyCanExecuteChanged();
+        }
+
+        if (NextLiveMiningPageCommand is not null)
+        {
+            NextLiveMiningPageCommand.NotifyCanExecuteChanged();
+        }
     }
 
     private static void AddPathIfPresent(ISet<string> paths, string? path)
