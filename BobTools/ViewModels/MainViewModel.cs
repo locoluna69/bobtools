@@ -877,7 +877,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             null,
             null,
             message => Status = message,
-            PersistMiningSessionHistoryFromItem,
+            (item, previousScan, updatedScan) => PersistMiningSessionHistoryFromItem(item, previousScan, updatedScan),
             "Queued",
             true,
             true);
@@ -1361,7 +1361,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             null,
             null,
             message => Status = message,
-            PersistMiningSessionHistoryFromItem,
+            (item, previousScan, updatedScan) => PersistMiningSessionHistoryFromItem(item, previousScan, updatedScan),
             entry.ProcessingState,
             false,
             true);
@@ -2355,7 +2355,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 RockScanParser.BuildSummary(scan),
                 jsonPath,
                 csvPath,
-                persistCallback: PersistMiningSessionHistoryFromItem);
+                persistCallback: (item, previousScan, updatedScan) => PersistMiningSessionHistoryFromItem(item, previousScan, updatedScan));
 
             OfflineMiningResults.Add(resultItem);
             resultItem.UsedOcrModeSummary = OcrModeCatalog.GetDisplayName(ocrResult.UsedMode);
@@ -2386,6 +2386,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
         await Task.Run(() =>
         {
+            var previousScan = SelectedOfflineMiningResult.ExtractedScan;
             var updatedScan = SelectedOfflineMiningResult.BuildUpdatedScan();
             var jsonPath = RockScanJsonStore.Save(updatedScan);
             var csvPath = RockScanCsvStore.Upsert(updatedScan);
@@ -2394,7 +2395,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             {
                 SelectedOfflineMiningResult.MarkSaved(updatedScan, jsonPath, csvPath);
                 OfflineMiningRockSummary = SelectedOfflineMiningResult.Summary;
-                PersistMiningSessionHistoryFromItem(SelectedOfflineMiningResult);
+                PersistMiningSessionHistoryFromItem(SelectedOfflineMiningResult, previousScan, updatedScan);
                 Status = $"Saved updated mining data to {jsonPath} and synchronized {csvPath}.";
             });
         });
@@ -2880,7 +2881,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         });
     }
 
-    private void PersistMiningSessionHistoryFromItem(OfflineMiningResultItem resultItem)
+    private void PersistMiningSessionHistoryFromItem(OfflineMiningResultItem resultItem, RockScan? previousScan = null, RockScan? updatedScan = null)
     {
         var workflowMode = string.Equals(resultItem.ExtractedScan.SourceType, "offline", StringComparison.OrdinalIgnoreCase)
             ? WorkflowModeCatalog.Offline
@@ -2899,6 +2900,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             _globalResultsStore.Upsert(CreateGlobalRecordFromLiveMiningResult(resultItem));
         }
+
+        AdjustMiningStatsForUpdatedScan(previousScan, updatedScan);
     }
 
     private GlobalResultRecord CreateGlobalRecordFromLiveScanResult(LiveScanResultItem resultItem)
@@ -3797,6 +3800,27 @@ public partial class MainViewModel : ObservableObject, IDisposable
         LifetimeRareOreCount += tierCounts.RareCount;
         LifetimeLegendaryOreCount += tierCounts.LegendaryCount;
         LifetimeMythicOreCount += tierCounts.MythicCount;
+        _settings.LifetimeRockCount = LifetimeRockCount;
+        _settings.LifetimeCommonOreCount = LifetimeCommonOreCount;
+        _settings.LifetimeRareOreCount = LifetimeRareOreCount;
+        _settings.LifetimeLegendaryOreCount = LifetimeLegendaryOreCount;
+        _settings.LifetimeMythicOreCount = LifetimeMythicOreCount;
+        _settingsService.Save(_settings);
+    }
+
+    private void AdjustMiningStatsForUpdatedScan(RockScan? previousScan, RockScan? updatedScan)
+    {
+        var delta = OreQualityTierCatalog.CalculateLifetimeDelta(previousScan, updatedScan);
+        if (delta == default)
+        {
+            return;
+        }
+
+        LifetimeRockCount = Math.Max(0, LifetimeRockCount + delta.RockDelta);
+        LifetimeCommonOreCount = Math.Max(0, LifetimeCommonOreCount + delta.CommonDelta);
+        LifetimeRareOreCount = Math.Max(0, LifetimeRareOreCount + delta.RareDelta);
+        LifetimeLegendaryOreCount = Math.Max(0, LifetimeLegendaryOreCount + delta.LegendaryDelta);
+        LifetimeMythicOreCount = Math.Max(0, LifetimeMythicOreCount + delta.MythicDelta);
         _settings.LifetimeRockCount = LifetimeRockCount;
         _settings.LifetimeCommonOreCount = LifetimeCommonOreCount;
         _settings.LifetimeRareOreCount = LifetimeRareOreCount;

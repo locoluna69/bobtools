@@ -17,7 +17,7 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
     private string _savedSnapshot = string.Empty;
     private int _autoSaveVersion;
     private readonly Action<string>? _statusCallback;
-    private readonly Action<OfflineMiningResultItem>? _persistCallback;
+    private readonly Action<OfflineMiningResultItem, RockScan?, RockScan?>? _persistCallback;
     private readonly bool _enableAutoSave;
     private bool _suppressDirtyTracking;
     private bool _suppressAutoSave;
@@ -55,7 +55,7 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
         string? jsonPath,
         string? csvPath,
         Action<string>? statusCallback = null,
-        Action<OfflineMiningResultItem>? persistCallback = null,
+        Action<OfflineMiningResultItem, RockScan?, RockScan?>? persistCallback = null,
         string processingState = "Ready",
         bool isProcessing = false,
         bool enableAutoSave = false)
@@ -558,7 +558,7 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
 
             if (forceMetadataPersist && !IsDirty)
             {
-                _persistCallback?.Invoke(this);
+                _persistCallback?.Invoke(this, null, null);
                 AutoSaveStatus = "Saved";
                 _statusCallback?.Invoke(successMessage);
                 return;
@@ -590,6 +590,7 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
 
         try
         {
+            var previousScan = ExtractedScan;
             var updatedScan = await Task.Run(() =>
             {
                 var scan = BuildUpdatedScan();
@@ -600,7 +601,7 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
 
             MarkSaved(updatedScan.Scan, updatedScan.JsonPath, updatedScan.CsvPath);
             ProcessingState = "Saved";
-            _persistCallback?.Invoke(this);
+            _persistCallback?.Invoke(this, previousScan, updatedScan.Scan);
             _statusCallback?.Invoke(successMessage ?? $"Saved updated mining data to {updatedScan.JsonPath} and synchronized {updatedScan.CsvPath}.");
         }
         catch (Exception ex)

@@ -29,6 +29,39 @@ public sealed class UtilityTests
     }
 
     [Fact]
+    public void OreQualityTierCatalog_CalculateLifetimeDelta_TracksTierChangesAcrossEdits()
+    {
+        var previousScan = new RockScan
+        {
+            Material = "Quantanium",
+            Elements =
+            [
+                new RockCompositionEntry("Ore A", 10m, 740),
+                new RockCompositionEntry("Ore B", 15m, 780),
+                new RockCompositionEntry("Ore C", 20m, 920)
+            ]
+        };
+
+        var updatedScan = previousScan with
+        {
+            Elements =
+            [
+                new RockCompositionEntry("Ore A", 10m, 780),
+                new RockCompositionEntry("Ore B", 15m, 850),
+                new RockCompositionEntry("Ore C", 20m, null)
+            ]
+        };
+
+        var delta = OreQualityTierCatalog.CalculateLifetimeDelta(previousScan, updatedScan);
+
+        Assert.Equal(0, delta.RockDelta);
+        Assert.Equal(-1, delta.CommonDelta);
+        Assert.Equal(0, delta.RareDelta);
+        Assert.Equal(1, delta.LegendaryDelta);
+        Assert.Equal(-1, delta.MythicDelta);
+    }
+
+    [Fact]
     public void RockScanParser_TryParse_ParsesStructuredScanText()
     {
         const string text = """

@@ -66,6 +66,26 @@ public static class OreQualityTierCatalog
         return new OreQualityBreakdown(common, rare, legendary, mythic);
     }
 
+    public static MiningStatsDelta CalculateLifetimeDelta(RockScan? previousScan, RockScan? updatedScan)
+    {
+        if (previousScan is null || updatedScan is null)
+        {
+            return default;
+        }
+
+        var previousWasMeaningful = HasMeaningfulMiningData(previousScan);
+        var updatedIsMeaningful = HasMeaningfulMiningData(updatedScan);
+        var previousTierCounts = previousWasMeaningful ? CountTiers(previousScan.Elements) : default;
+        var updatedTierCounts = updatedIsMeaningful ? CountTiers(updatedScan.Elements) : default;
+
+        return new MiningStatsDelta(
+            (updatedIsMeaningful ? 1 : 0) - (previousWasMeaningful ? 1 : 0),
+            updatedTierCounts.CommonCount - previousTierCounts.CommonCount,
+            updatedTierCounts.RareCount - previousTierCounts.RareCount,
+            updatedTierCounts.LegendaryCount - previousTierCounts.LegendaryCount,
+            updatedTierCounts.MythicCount - previousTierCounts.MythicCount);
+    }
+
     public static CompactOreHighlight GetCompactHighlight(int? quality, bool isTargetMatch)
     {
         return GetTierKey(quality) switch
@@ -77,8 +97,20 @@ public static class OreQualityTierCatalog
             _ => new CompactOreHighlight("#052E2B", "#0F766E", "#D1FAE5")
         };
     }
+
+    private static bool HasMeaningfulMiningData(RockScan rockScan)
+    {
+        return !string.IsNullOrWhiteSpace(rockScan.Material)
+            || rockScan.Mass is not null
+            || rockScan.Resistance is not null
+            || rockScan.Instability is not null
+            || rockScan.Composition is not null
+            || rockScan.Elements.Count > 0;
+    }
 }
 
 public readonly record struct OreQualityBreakdown(int CommonCount, int RareCount, int LegendaryCount, int MythicCount);
+
+public readonly record struct MiningStatsDelta(int RockDelta, int CommonDelta, int RareDelta, int LegendaryDelta, int MythicDelta);
 
 public readonly record struct CompactOreHighlight(string BackgroundBrush, string BorderBrush, string ForegroundBrush);
