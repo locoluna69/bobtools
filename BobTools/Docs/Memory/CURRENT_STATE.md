@@ -13,10 +13,12 @@ BobTools is a Windows WPF overlay app for Star Citizen that:
 
 ### Shared persistence and review workflow
 
-- Live scan and live mining rows are now persisted in a canonical global store at `LocalAppData/BobTools/live-results.json`.
-- Session history still exists under `LocalAppData/BobTools/Sessions/{sessionId}/session.json`, but it is no longer the primary mutable store for live review state.
+- Live scan and live mining rows are now persisted in SQLite at `LocalAppData/BobTools/bobtools.db`.
+- Session history is also persisted in the same SQLite database and legacy JSON session files are migrated on demand.
+- Legacy `live-results.json` and `Sessions/{sessionId}/session.json` files are treated as migration sources rather than the primary mutable store.
 - The Settings dialog can clear the canonical live-results store without deleting session history or exported artifacts.
 - Rehydrated live rows are restored from the canonical store on startup.
+- Live result views now page to 25 rows at a time and only load preview images for the currently visible page.
 
 ### Signature
 
@@ -112,8 +114,9 @@ BobTools is a Windows WPF overlay app for Star Citizen that:
 
 ## Current data/debug locations
 
-- Canonical live results store: `LocalAppData/BobTools/live-results.json`
-- Session history: `LocalAppData/BobTools/Sessions/{sessionId}/session.json`
+- Canonical internal database: `LocalAppData/BobTools/bobtools.db`
+- Legacy live results migration source: `LocalAppData/BobTools/live-results.json`
+- Legacy session migration source: `LocalAppData/BobTools/Sessions/{sessionId}/session.json`
 - Local debug captures: `LocalAppData/BobTools/DebugCaptures`
 - Scan training batch exports: `LocalAppData/BobTools/Exports/scan-training/{batchId}.zip`
 - Mining scan CSV: `LocalAppData/BobTools/RockScans/rock_scans.csv`
@@ -123,6 +126,14 @@ BobTools is a Windows WPF overlay app for Star Citizen that:
 - Signature lookup data: [Assets/data/signatures.csv](Assets/data/signatures.csv)
 - Mining material reference data: [Assets/data/commodities.json](Assets/data/commodities.json)
 - Signature icon template: [Assets/images/signature_icon.png](Assets/images/signature_icon.png)
+- Startup crash logs: `LocalAppData/BobTools/logs/startup-error-*.log`
+
+## Current developer workflow summary
+
+- Build with `dotnet build BobTools.sln`
+- Run with `dotnet run --project BobTools.csproj`
+- Run tests with `dotnet test BobTools.Tests/BobTools.Tests.csproj`
+- GitHub Actions runs the Windows test suite from `.github/workflows/dotnet-tests.yml`
 
 ## Known-good current decisions
 
@@ -136,6 +147,8 @@ BobTools is a Windows WPF overlay app for Star Citizen that:
 - Keep `Assets/data/commodities.json` current, because the mining parser now uses its extractable commodity entries as the canonical material list for normalization.
 - Offline mining edits persist by overwriting `rock_scan.json` for the selected result and upserting the matching CSV row by rock scan `ID`.
 - Use review state on live rows as the gate for dataset curation instead of the old session-export model.
+- Use SQLite for internal live/session persistence so updates do not rewrite entire JSON documents.
+- Use UI paging and lazy preview loading to keep the live-results experience responsive as history grows.
 
 ## Good next steps if work resumes
 
@@ -148,6 +161,7 @@ BobTools is a Windows WPF overlay app for Star Citizen that:
 - add `sourceImageName` or scenario labels to OCR log entries for offline test-set comparisons
 - add explicit pipeline outcome labels such as `fast-success`, `fast-rejected`, and `fallback-numeric`
 - consider a secondary icon-search pass constrained to the expected in-game UI band for the last difficult signature images
+- expand tests around viewmodel paging behavior and non-asset-backed utility paths
 
 ## If something breaks
 

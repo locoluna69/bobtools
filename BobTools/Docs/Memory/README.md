@@ -2,6 +2,8 @@
 
 This folder is the project memory bank for BobTools.
 
+It complements the top-level project guide in `README.md` by tracking session-to-session engineering context.
+
 ## Purpose
 
 Use this folder to keep session-to-session context that is expensive to rediscover, including:
@@ -28,3 +30,9 @@ Use this folder to keep session-to-session context that is expensive to rediscov
 - `2026-03-17-ocr-performance-tuning.md` — detailed notes on signature OCR instrumentation, tuning, drift observations, and remaining gaps.
 - `2026-03-18-signature-recognizer-plan.md` — concrete plan for building and integrating a signature-specific recognizer for BobTools.
 - `2026-03-18-bobtools-export-training-guide.md` — step-by-step workflow for turning BobTools user export zips into reviewed training manifests.
+
+## What should stay current
+
+- `CURRENT_STATE.md` should reflect the real runtime architecture, storage model, and major workflows.
+- `README.md` at the repo root should reflect how to build, run, and test the app.
+- Handoff files should capture why a change was made when that reasoning is not obvious from code.
