@@ -43,6 +43,24 @@ internal static class OcrModeCatalog
             return "Unknown";
         }
 
+        if (value.StartsWith("mining-row-segmented|", StringComparison.OrdinalIgnoreCase))
+        {
+            var innerMode = value.Split('|', 2, StringSplitOptions.TrimEntries).ElementAtOrDefault(1);
+            return $"Row-Segmented Mining ({GetDisplayName(innerMode)})";
+        }
+
+        if (value.StartsWith("mining-hybrid-rows|", StringComparison.OrdinalIgnoreCase))
+        {
+            var innerMode = value.Split('|', 2, StringSplitOptions.TrimEntries).ElementAtOrDefault(1);
+            return $"Hybrid Mining (rows via {GetDisplayName(innerMode)})";
+        }
+
+        if (value.StartsWith("mining-hybrid-whole|", StringComparison.OrdinalIgnoreCase))
+        {
+            var innerMode = value.Split('|', 2, StringSplitOptions.TrimEntries).ElementAtOrDefault(1);
+            return $"Hybrid Mining (whole region via {GetDisplayName(innerMode)})";
+        }
+
         if (value.Contains('|'))
         {
             var parts = value.Split('|', 2, StringSplitOptions.TrimEntries);

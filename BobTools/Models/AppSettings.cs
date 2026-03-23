@@ -27,6 +27,7 @@ public sealed class AppSettings
     public bool SaveDebugImages { get; set; }
     public bool CaptureOnlyMode { get; set; }
     public string OcrMode { get; set; } = "auto";
+    public string MiningOcrStrategy { get; set; } = MiningOcrStrategyCatalog.WholeRegion;
     public string ActiveCaptureProfile { get; set; } = "signature";
     public string ActiveWorkflowMode { get; set; } = "scanning";
     public string LastShip { get; set; } = string.Empty;

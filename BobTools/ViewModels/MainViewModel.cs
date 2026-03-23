@@ -60,6 +60,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string miningCaptureRegionSummary = "No region selected.";
     [ObservableProperty] private bool saveDebugImages;
     [ObservableProperty] private string selectedOcrMode = OcrModeCatalog.Auto;
+    [ObservableProperty] private string selectedMiningOcrStrategy = MiningOcrStrategyCatalog.WholeRegion;
     [ObservableProperty] private string lastUsedOcrMode = "Last OCR mode: none yet";
     [ObservableProperty] private string lastOcrSourceSummary = "OCR source: none yet";
     [ObservableProperty] private System.Windows.Media.Brush lastOcrSourceBrush = System.Windows.Media.Brushes.SlateGray;
@@ -172,6 +173,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public IRelayCommand PreviousLiveMiningPageCommand { get; }
     public IRelayCommand NextLiveMiningPageCommand { get; }
     public IReadOnlyList<OcrModeOption> OcrModeOptions { get; } = OcrModeCatalog.Options;
+    public IReadOnlyList<CaptureProfileOption> MiningOcrStrategyOptions { get; } = MiningOcrStrategyCatalog.Options;
     public IReadOnlyList<CaptureProfileOption> WorkflowModeOptions { get; } = WorkflowModeCatalog.Options;
     public IReadOnlyList<CaptureProfileOption> CaptureProfileOptions { get; } = CaptureProfileCatalog.Options;
     public IReadOnlyList<HotkeyModifierOption> HotkeyModifierOptions { get; } = HotkeyCatalog.ModifierOptions;
@@ -193,6 +195,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public ICollectionView LiveMiningResultsView => _liveMiningResultsView;
 
     public bool IsOfflineMiningSelected => string.Equals(OfflineSelectedCaptureProfile, CaptureProfileCatalog.Mining, StringComparison.OrdinalIgnoreCase);
+    public string MiningOcrStrategyDescription => MiningOcrStrategyCatalog.GetDescription(SelectedMiningOcrStrategy);
     public bool IsScanningMode => string.Equals(SelectedWorkflowMode, WorkflowModeCatalog.Scanning, StringComparison.OrdinalIgnoreCase);
     public bool IsMiningMode => string.Equals(SelectedWorkflowMode, WorkflowModeCatalog.Mining, StringComparison.OrdinalIgnoreCase);
     public bool IsOfflineMode => string.Equals(SelectedWorkflowMode, WorkflowModeCatalog.Offline, StringComparison.OrdinalIgnoreCase);
@@ -241,6 +244,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         lifetimeLegendaryOreCount = _settings.LifetimeLegendaryOreCount;
         lifetimeMythicOreCount = _settings.LifetimeMythicOreCount;
         selectedOcrMode = OcrModeCatalog.Auto;
+        selectedMiningOcrStrategy = _settings.MiningOcrStrategy;
         selectedWorkflowMode = WorkflowModeCatalog.Scanning;
         selectedCaptureProfile = CaptureProfileCatalog.Signature;
         var settingsChanged = false;
@@ -887,7 +891,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         UpdateLiveMiningQueueSummary();
 
         await _liveMiningQueue.Writer.WriteAsync(
-            new QueuedLiveMiningCapture(sourceImagePath, debugOutputDirectory, SelectedOcrMode, placeholderScan, resultItem),
+            new QueuedLiveMiningCapture(sourceImagePath, debugOutputDirectory, SelectedOcrMode, SelectedMiningOcrStrategy, placeholderScan, resultItem),
             _liveMiningQueueCancellation.Token);
     }
 
@@ -1507,6 +1511,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 resultItem.SourceImagePath,
                 resultItem.ExtractedScan.DebugFolderPath,
                 SelectedOcrMode,
+                SelectedMiningOcrStrategy,
                 resultItem.ExtractedScan,
                 resultItem),
             _liveMiningQueueCancellation.Token);
@@ -1715,6 +1720,21 @@ public partial class MainViewModel : ObservableObject, IDisposable
         if (!string.Equals(value, OcrModeCatalog.Auto, StringComparison.OrdinalIgnoreCase))
         {
             SelectedOcrMode = OcrModeCatalog.Auto;
+        }
+    }
+
+    partial void OnSelectedMiningOcrStrategyChanged(string value)
+    {
+        _settings.MiningOcrStrategy = MiningOcrStrategyCatalog.IsValid(value)
+            ? value
+            : MiningOcrStrategyCatalog.WholeRegion;
+        _settingsService.Save(_settings);
+        UpdateOverlaySettingsSummary();
+        OnPropertyChanged(nameof(MiningOcrStrategyDescription));
+
+        if (!MiningOcrStrategyCatalog.IsValid(value))
+        {
+            SelectedMiningOcrStrategy = MiningOcrStrategyCatalog.WholeRegion;
         }
     }
 
@@ -2330,11 +2350,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 SaveOfflineDebugArtifacts(debugOutputDirectory, inputImage.FilePath, sourceBitmap, croppedBitmap, cropBounds, useWholeImage);
             }
 
-            var ocrResult = await _ocrService.ExtractTextAsync(croppedBitmap, debugOutputDirectory, SelectedOcrMode, OfflineSelectedCaptureProfile);
-            LastUsedOcrMode = $"Last OCR mode: {OcrModeCatalog.GetDisplayName(ocrResult.UsedMode)}";
-            LastOcrSourceSummary = GetOcrSourceSummary(ocrResult.UsedMode, OfflineSelectedCaptureProfile);
+            var miningOcr = await ExtractMiningOcrAsync(croppedBitmap, debugOutputDirectory, SelectedOcrMode, SelectedMiningOcrStrategy);
+            LastUsedOcrMode = $"Last OCR mode: {OcrModeCatalog.GetDisplayName(miningOcr.OcrResult.UsedMode)}";
+            LastOcrSourceSummary = GetOcrSourceSummary(miningOcr.OcrResult.UsedMode, OfflineSelectedCaptureProfile);
 
-            var scan = BuildOfflineMiningScan(ocrResult.NormalizedText, inputImage.FilePath, debugOutputDirectory);
+            var scan = BuildOfflineMiningScan(miningOcr.OcrResult.NormalizedText, inputImage.FilePath, debugOutputDirectory);
             string? csvPath = null;
             string? jsonPath = null;
 
@@ -2351,7 +2371,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
             var resultItem = new OfflineMiningResultItem(
                 inputImage.FilePath,
-                ResolveProcessedImagePath(debugOutputDirectory, ocrResult.UsedMode) ?? Path.Combine(debugOutputDirectory ?? string.Empty, "01_capture.png"),
+                miningOcr.ProcessedImagePath ?? Path.Combine(debugOutputDirectory ?? string.Empty, "01_capture.png"),
                 scan,
                 RockScanParser.BuildSummary(scan),
                 jsonPath,
@@ -2359,8 +2379,8 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 persistCallback: (item, previousScan, updatedScan) => PersistMiningSessionHistoryFromItem(item, previousScan, updatedScan));
 
             OfflineMiningResults.Add(resultItem);
-            resultItem.UsedOcrModeSummary = OcrModeCatalog.GetDisplayName(ocrResult.UsedMode);
-            resultItem.OcrSourceSummary = GetOcrSourceSummary(ocrResult.UsedMode, OfflineSelectedCaptureProfile);
+            resultItem.UsedOcrModeSummary = OcrModeCatalog.GetDisplayName(miningOcr.OcrResult.UsedMode);
+            resultItem.OcrSourceSummary = GetOcrSourceSummary(miningOcr.OcrResult.UsedMode, OfflineSelectedCaptureProfile);
             PersistMiningSessionHistoryFromItem(resultItem);
             if (HasMeaningfulMiningData(scan))
             {
@@ -2607,7 +2627,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private void UpdateOverlaySettingsSummary()
     {
-        OverlaySettingsSummary = $"Capture only: {(CaptureOnlyMode ? "On" : "Off")}  |  Save debug: {(SaveDebugImages ? "On" : "Off")}  |  Transparency: {OverlayOpacity:P0}  |  Compact scale: {CompactModeScale:P0}";
+        OverlaySettingsSummary = $"Capture only: {(CaptureOnlyMode ? "On" : "Off")}  |  Save debug: {(SaveDebugImages ? "On" : "Off")}  |  Mining OCR: {MiningOcrStrategyCatalog.GetDisplayName(SelectedMiningOcrStrategy)}  |  Transparency: {OverlayOpacity:P0}  |  Compact scale: {CompactModeScale:P0}";
     }
 
     private void ApplyRecommendedHotkey()
@@ -3467,6 +3487,150 @@ public partial class MainViewModel : ObservableObject, IDisposable
         return BuildMiningScan(normalizedText, baseScan);
     }
 
+    private async Task<MiningOcrExecutionResult> ExtractMiningOcrAsync(Bitmap bitmap, string? debugOutputDirectory, string requestedOcrMode, string requestedStrategy)
+    {
+        var strategy = MiningOcrStrategyCatalog.IsValid(requestedStrategy)
+            ? requestedStrategy
+            : MiningOcrStrategyCatalog.WholeRegion;
+
+        if (string.Equals(strategy, MiningOcrStrategyCatalog.WholeRegion, StringComparison.OrdinalIgnoreCase))
+        {
+            var wholeRegionCandidate = await RunWholeRegionMiningOcrAsync(bitmap, debugOutputDirectory, requestedOcrMode);
+            return FinalizeMiningOcrExecution(strategy, wholeRegionCandidate);
+        }
+
+        var rowSegmentedCandidate = await RunRowSegmentedMiningOcrAsync(bitmap, debugOutputDirectory, requestedOcrMode);
+        if (string.Equals(strategy, MiningOcrStrategyCatalog.RowSegmented, StringComparison.OrdinalIgnoreCase))
+        {
+            return FinalizeMiningOcrExecution(strategy, rowSegmentedCandidate);
+        }
+
+        var wholeRegionHybridCandidate = await RunWholeRegionMiningOcrAsync(bitmap, debugOutputDirectory, requestedOcrMode);
+        var selectedCandidate = MiningOcrSegmentation.SelectPreferredCandidate(
+            [wholeRegionHybridCandidate.Candidate, rowSegmentedCandidate.Candidate]);
+
+        return FinalizeMiningOcrExecution(
+            strategy,
+            selectedCandidate == rowSegmentedCandidate.Candidate ? rowSegmentedCandidate : wholeRegionHybridCandidate);
+    }
+
+    private async Task<MiningOcrExecutionCandidate> RunWholeRegionMiningOcrAsync(Bitmap bitmap, string? debugOutputDirectory, string requestedOcrMode)
+    {
+        var ocrResult = await _ocrService.ExtractTextAsync(bitmap, debugOutputDirectory, requestedOcrMode, CaptureProfileCatalog.Mining);
+        return new MiningOcrExecutionCandidate(
+            MiningOcrSegmentation.CreateCandidate(MiningOcrStrategyCatalog.WholeRegion, ocrResult.UsedMode, ocrResult.NormalizedText, 1),
+            ocrResult,
+            ResolveProcessedImagePath(debugOutputDirectory, ocrResult.UsedMode));
+    }
+
+    private async Task<MiningOcrExecutionCandidate> RunRowSegmentedMiningOcrAsync(Bitmap bitmap, string? debugOutputDirectory, string requestedOcrMode)
+    {
+        var detectedRowBounds = MiningOcrSegmentation.DetectRowBounds(bitmap);
+        var rowBounds = detectedRowBounds.Count > 0
+            ? detectedRowBounds
+            : [new Rectangle(0, 0, bitmap.Width, bitmap.Height)];
+        var rowTexts = new List<string>();
+        var rowRawTexts = new List<string>();
+        var rowUsedModes = new List<string>();
+        var rowConfidences = new List<double>();
+
+        for (var index = 0; index < rowBounds.Count; index++)
+        {
+            using var rowBitmap = bitmap.Clone(rowBounds[index], bitmap.PixelFormat);
+            string? rowDebugDirectory = null;
+            if (!string.IsNullOrWhiteSpace(debugOutputDirectory))
+            {
+                rowDebugDirectory = Path.Combine(debugOutputDirectory, "rows", $"row_{index + 1:D2}");
+                Directory.CreateDirectory(rowDebugDirectory);
+                PngMetadataWriter.SaveBitmapWithSessionMetadata(
+                    rowBitmap,
+                    Path.Combine(rowDebugDirectory, "00_row.png"),
+                    BuildCurrentSessionMetadata(),
+                    App.SessionId,
+                    CaptureProfileCatalog.Mining,
+                    "row-segment");
+            }
+
+            var rowResult = await _ocrService.ExtractTextAsync(rowBitmap, rowDebugDirectory, requestedOcrMode, CaptureProfileCatalog.Mining);
+            var trimmedText = rowResult.NormalizedText.Trim();
+            if (!string.IsNullOrWhiteSpace(trimmedText))
+            {
+                rowTexts.Add(trimmedText);
+            }
+
+            if (!string.IsNullOrWhiteSpace(rowResult.RawText))
+            {
+                rowRawTexts.Add(rowResult.RawText.Trim());
+            }
+
+            if (!string.IsNullOrWhiteSpace(rowResult.UsedMode))
+            {
+                rowUsedModes.Add(rowResult.UsedMode);
+            }
+
+            rowConfidences.Add(rowResult.Confidence);
+        }
+
+        var normalizedText = MiningOcrSegmentation.CombineRowTexts(rowTexts);
+        var rawText = MiningOcrSegmentation.CombineRowTexts(rowRawTexts);
+        var dominantUsedMode = rowUsedModes
+            .GroupBy(mode => mode, StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(group => group.Count())
+            .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.Key)
+            .FirstOrDefault() ?? OcrModeCatalog.Auto;
+        var ocrResult = new OcrResult
+        {
+            RawText = rawText,
+            NormalizedText = normalizedText,
+            Confidence = rowConfidences.Count == 0 ? 0 : rowConfidences.Average(),
+            UsedMode = dominantUsedMode
+        };
+
+        return new MiningOcrExecutionCandidate(
+            MiningOcrSegmentation.CreateCandidate(MiningOcrStrategyCatalog.RowSegmented, dominantUsedMode, normalizedText, rowBounds.Count),
+            ocrResult,
+            null);
+    }
+
+    private static MiningOcrExecutionResult FinalizeMiningOcrExecution(string requestedStrategy, MiningOcrExecutionCandidate candidate)
+    {
+        var decoratedUsedMode = DecorateMiningUsedMode(requestedStrategy, candidate.Candidate);
+        return new MiningOcrExecutionResult(
+            requestedStrategy,
+            candidate.Candidate.Strategy,
+            new OcrResult
+            {
+                RawText = candidate.OcrResult.RawText,
+                NormalizedText = candidate.OcrResult.NormalizedText,
+                Confidence = candidate.OcrResult.Confidence,
+                UsedMode = decoratedUsedMode
+            },
+            candidate.ProcessedImagePath);
+    }
+
+    private static string DecorateMiningUsedMode(string requestedStrategy, MiningOcrCandidate candidate)
+    {
+        var baseMode = string.IsNullOrWhiteSpace(candidate.UsedMode)
+            ? OcrModeCatalog.Auto
+            : candidate.UsedMode;
+
+        if (string.Equals(requestedStrategy, MiningOcrStrategyCatalog.RowSegmented, StringComparison.OrdinalIgnoreCase))
+        {
+            return $"mining-row-segmented|{baseMode}";
+        }
+
+        if (string.Equals(requestedStrategy, MiningOcrStrategyCatalog.Hybrid, StringComparison.OrdinalIgnoreCase))
+        {
+            var winnerPrefix = string.Equals(candidate.Strategy, MiningOcrStrategyCatalog.RowSegmented, StringComparison.OrdinalIgnoreCase)
+                ? "mining-hybrid-rows"
+                : "mining-hybrid-whole";
+            return $"{winnerPrefix}|{baseMode}";
+        }
+
+        return baseMode;
+    }
+
     private async Task ProcessLiveScanQueueAsync(CancellationToken cancellationToken)
     {
         await foreach (var queuedCapture in _liveScanQueue.Reader.ReadAllAsync(cancellationToken))
@@ -3537,20 +3701,20 @@ public partial class MainViewModel : ObservableObject, IDisposable
                 queuedCapture.ResultItem.SetProcessingState("Processing OCR...", true);
 
                 using var bitmap = new Bitmap(queuedCapture.SourceImagePath);
-                var ocrResult = await _ocrService.ExtractTextAsync(bitmap, queuedCapture.DebugOutputDirectory, queuedCapture.RequestedOcrMode, CaptureProfileCatalog.Mining);
-                var completedScan = BuildMiningScan(ocrResult.NormalizedText, queuedCapture.PlaceholderScan);
+                var miningOcr = await ExtractMiningOcrAsync(bitmap, queuedCapture.DebugOutputDirectory, queuedCapture.RequestedOcrMode, queuedCapture.RequestedMiningOcrStrategy);
+                var completedScan = BuildMiningScan(miningOcr.OcrResult.NormalizedText, queuedCapture.PlaceholderScan);
                 var persistedJsonPath = RockScanJsonStore.Save(completedScan);
                 var persistedCsvPath = RockScanCsvStore.Append(completedScan);
-                var processedImagePath = ResolveProcessedImagePath(queuedCapture.DebugOutputDirectory, ocrResult.UsedMode) ?? queuedCapture.SourceImagePath;
+                var processedImagePath = miningOcr.ProcessedImagePath ?? queuedCapture.SourceImagePath;
                 var summary = RockScanParser.BuildSummary(completedScan);
 
                 await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
                 {
-                    var usedOcrModeSummary = OcrModeCatalog.GetDisplayName(ocrResult.UsedMode);
-                    var ocrSourceSummary = GetOcrSourceSummary(ocrResult.UsedMode, CaptureProfileCatalog.Mining);
+                    var usedOcrModeSummary = OcrModeCatalog.GetDisplayName(miningOcr.OcrResult.UsedMode);
+                    var ocrSourceSummary = GetOcrSourceSummary(miningOcr.OcrResult.UsedMode, CaptureProfileCatalog.Mining);
 
-                    LastExtractedText = ocrResult.NormalizedText;
-                    AcceptedText = ocrResult.NormalizedText;
+                    LastExtractedText = miningOcr.OcrResult.NormalizedText;
+                    AcceptedText = miningOcr.OcrResult.NormalizedText;
                     LastUsedOcrMode = $"Last OCR mode: {usedOcrModeSummary}";
                     LastOcrSourceSummary = ocrSourceSummary;
                     SignatureResourceSummary = "Scan resource: n/a for Mining";
@@ -3858,6 +4022,21 @@ public partial class MainViewModel : ObservableObject, IDisposable
 
     private static string GetOcrSourceSummary(string? usedMode, string? captureProfile)
     {
+        if (usedMode?.StartsWith("mining-row-segmented|", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            return "OCR source: Row-segmented mining OCR";
+        }
+
+        if (usedMode?.StartsWith("mining-hybrid-rows|", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            return "OCR source: Hybrid mining OCR (row winner)";
+        }
+
+        if (usedMode?.StartsWith("mining-hybrid-whole|", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            return "OCR source: Hybrid mining OCR (whole-region winner)";
+        }
+
         if (usedMode?.StartsWith("signature-icon-value|", StringComparison.OrdinalIgnoreCase) == true)
         {
             return "OCR source: Scan icon-guided crop";
@@ -3937,6 +4116,18 @@ public partial class MainViewModel : ObservableObject, IDisposable
         string SourceImagePath,
         string? DebugOutputDirectory,
         string RequestedOcrMode,
+        string RequestedMiningOcrStrategy,
         RockScan PlaceholderScan,
         OfflineMiningResultItem ResultItem);
+
+    private sealed record MiningOcrExecutionCandidate(
+        MiningOcrCandidate Candidate,
+        OcrResult OcrResult,
+        string? ProcessedImagePath);
+
+    private sealed record MiningOcrExecutionResult(
+        string RequestedStrategy,
+        string SelectedStrategy,
+        OcrResult OcrResult,
+        string? ProcessedImagePath);
 }

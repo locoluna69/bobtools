@@ -1,3 +1,4 @@
+using System.Drawing;
 using BobTools.Models;
 using BobTools.Utils;
 using System.Reflection;
@@ -185,6 +186,67 @@ COMPOSITION: 12.5%
         Assert.Contains("Quantanium", summary);
         Assert.Contains("Composition 12.5", summary);
         Assert.DoesNotContain("Composition 12.5%", summary);
+    }
+
+    [Fact]
+    public void MiningOcrSegmentation_DetectRowBounds_FindsSeparatedTextBands()
+    {
+        using var bitmap = new Bitmap(180, 120);
+        using var graphics = Graphics.FromImage(bitmap);
+        graphics.Clear(Color.White);
+        using var brush = new SolidBrush(Color.Black);
+
+        graphics.FillRectangle(brush, 12, 10, 140, 8);
+        graphics.FillRectangle(brush, 14, 42, 132, 9);
+        graphics.FillRectangle(brush, 18, 78, 128, 8);
+
+        var rowBounds = MiningOcrSegmentation.DetectRowBounds(bitmap);
+
+        Assert.Equal(3, rowBounds.Count);
+        Assert.InRange(rowBounds[0].Y, 8, 12);
+        Assert.InRange(rowBounds[1].Y, 40, 44);
+        Assert.InRange(rowBounds[2].Y, 76, 80);
+        Assert.All(rowBounds, bounds => Assert.Equal(bitmap.Width, bounds.Width));
+    }
+
+    [Fact]
+    public void MiningOcrSegmentation_SelectPreferredCandidate_PrefersMoreCompleteParse()
+    {
+        var wholeRegion = MiningOcrSegmentation.CreateCandidate(
+            MiningOcrStrategyCatalog.WholeRegion,
+            OcrModeCatalog.GrayscaleBlock,
+            "QUANTANIUM\nMASS: 4500\n",
+            1);
+        var rowSegmented = MiningOcrSegmentation.CreateCandidate(
+            MiningOcrStrategyCatalog.RowSegmented,
+            OcrModeCatalog.GrayscaleBlock,
+            "QUANTANIUM\nMASS: 4500\nRESISTANCE: 42.5%\nINSTABILITY: 0.35\nCOMPOSITION: 12.5%\n12.5% QUANTANIUM 950",
+            5);
+
+        var selected = MiningOcrSegmentation.SelectPreferredCandidate([wholeRegion, rowSegmented]);
+
+        Assert.Equal(MiningOcrStrategyCatalog.RowSegmented, selected.Strategy);
+        Assert.True(selected.ParseScore > wholeRegion.ParseScore);
+        Assert.True(selected.PopulatedFieldCount > wholeRegion.PopulatedFieldCount);
+    }
+
+    [Fact]
+    public void MiningOcrSegmentation_SelectPreferredCandidate_PrefersWholeRegionOnExactTie()
+    {
+        var wholeRegion = MiningOcrSegmentation.CreateCandidate(
+            MiningOcrStrategyCatalog.WholeRegion,
+            OcrModeCatalog.GrayscaleBlock,
+            "QUANTANIUM\nMASS: 4500",
+            1);
+        var rowSegmented = MiningOcrSegmentation.CreateCandidate(
+            MiningOcrStrategyCatalog.RowSegmented,
+            OcrModeCatalog.GrayscaleBlock,
+            "QUANTANIUM\nMASS: 4500",
+            2);
+
+        var selected = MiningOcrSegmentation.SelectPreferredCandidate([wholeRegion, rowSegmented]);
+
+        Assert.Equal(MiningOcrStrategyCatalog.WholeRegion, selected.Strategy);
     }
 
     [Fact]

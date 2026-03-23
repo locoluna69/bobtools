@@ -47,6 +47,11 @@ public sealed class SettingsService : ISettingsService
             settings.OcrMode = OcrModeCatalog.Auto;
         }
 
+        if (!MiningOcrStrategyCatalog.IsValid(settings.MiningOcrStrategy))
+        {
+            settings.MiningOcrStrategy = MiningOcrStrategyCatalog.WholeRegion;
+        }
+
         if (!settings.SignatureCaptureRegion.IsValid && !settings.MiningCaptureRegion.IsValid && settings.CaptureRegion.IsValid)
         {
             settings.SignatureCaptureRegion = settings.CaptureRegion;

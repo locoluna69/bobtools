@@ -19,6 +19,7 @@ public sealed class SettingsServiceTests
             HotkeyModifiers = 0x0002 | 0x0004,
             HotkeyVirtualKey = 0x51,
             OcrMode = "bad-mode",
+            MiningOcrStrategy = "bad-strategy",
             ActiveCaptureProfile = "bad-profile",
             ActiveWorkflowMode = "bad-workflow",
             CaptureRegion = new CaptureRegion { X = 10, Y = 20, Width = 30, Height = 40 },
@@ -52,6 +53,7 @@ public sealed class SettingsServiceTests
         Assert.Equal(HotkeyCatalog.DefaultModifiers, loaded.HotkeyModifiers);
         Assert.Equal(HotkeyCatalog.DefaultVirtualKey, loaded.HotkeyVirtualKey);
         Assert.Equal(OcrModeCatalog.Auto, loaded.OcrMode);
+        Assert.Equal(MiningOcrStrategyCatalog.WholeRegion, loaded.MiningOcrStrategy);
         Assert.Equal(CaptureProfileCatalog.Signature, loaded.ActiveCaptureProfile);
         Assert.Equal(WorkflowModeCatalog.Scanning, loaded.ActiveWorkflowMode);
         Assert.Equal(settings.CaptureRegion.X, loaded.SignatureCaptureRegion.X);
@@ -89,6 +91,7 @@ public sealed class SettingsServiceTests
             HotkeyModifiers = HotkeyCatalog.DefaultModifiers,
             HotkeyVirtualKey = HotkeyCatalog.DefaultVirtualKey,
             OcrMode = OcrModeCatalog.GrayscaleBlock,
+            MiningOcrStrategy = MiningOcrStrategyCatalog.Hybrid,
             ActiveCaptureProfile = CaptureProfileCatalog.Mining,
             ActiveWorkflowMode = WorkflowModeCatalog.Mining,
             OverlayOpacity = 0.77,
@@ -115,6 +118,7 @@ public sealed class SettingsServiceTests
         var loaded = service.Load();
 
         Assert.Equal(OcrModeCatalog.GrayscaleBlock, loaded.OcrMode);
+        Assert.Equal(MiningOcrStrategyCatalog.Hybrid, loaded.MiningOcrStrategy);
         Assert.Equal(CaptureProfileCatalog.Mining, loaded.ActiveCaptureProfile);
         Assert.Equal(WorkflowModeCatalog.Mining, loaded.ActiveWorkflowMode);
         Assert.Equal(0.77, loaded.OverlayOpacity, 3);
@@ -134,6 +138,7 @@ public sealed class SettingsServiceTests
         Assert.Equal("Ctrl+Shift+F10", HotkeyCatalog.Format(HotkeyCatalog.DefaultModifiers, HotkeyCatalog.DefaultVirtualKey));
         Assert.Equal("Unknown", CaptureProfileCatalog.GetDisplayName("unknown"));
         Assert.Equal("Contrast Grayscale Block (from Auto)", OcrModeCatalog.GetDisplayName("grayscale-contrast-block|auto"));
+        Assert.Equal("Hybrid", MiningOcrStrategyCatalog.GetDisplayName(MiningOcrStrategyCatalog.Hybrid));
         Assert.Equal(CaptureProfileCatalog.Mining, WorkflowModeCatalog.GetCaptureProfile(WorkflowModeCatalog.Mining));
         Assert.Null(WorkflowModeCatalog.GetCaptureProfile(WorkflowModeCatalog.Offline));
     }
