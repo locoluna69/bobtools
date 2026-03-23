@@ -6,3 +6,5 @@ obj/
 *.userosscache
 *.sln.docstates
 Checkpoints/
+.env
+publish/

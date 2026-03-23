@@ -60,7 +60,9 @@ public partial class MainWindow : Window
             sessionHistoryService,
             globalResultsStore,
             new ScreenCaptureService(),
-            new OcrService(tessDataPath),
+            new AzureOcrService(
+                Environment.GetEnvironmentVariable("AZURE_CV_ENDPOINT") ?? string.Empty,
+                Environment.GetEnvironmentVariable("AZURE_CV_KEY") ?? string.Empty),
             new RsiProfileImageService(Path.Combine(appData, "ProfileImages")));
 
         DataContext = _viewModel;

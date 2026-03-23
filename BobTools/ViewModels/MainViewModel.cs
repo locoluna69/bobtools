@@ -159,6 +159,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
     public ICommand CaptureActiveModeCommand { get; }
     public ICommand ReplayDebugFolderCommand { get; }
     public ICommand RunOfflineTestCommand { get; }
+    public ICommand BrowseOfflineImageCommand { get; }
     public IAsyncRelayCommand SaveOfflineMiningEditsCommand { get; }
     public IRelayCommand AddOfflineMiningRowCommand { get; }
     public IRelayCommand<OfflineMiningElementEditRow> DeleteOfflineMiningRowCommand { get; }
@@ -338,6 +339,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         CaptureActiveModeCommand = new AsyncRelayCommand(CaptureActiveModeAsync);
         ReplayDebugFolderCommand = new AsyncRelayCommand(ReplayDebugFolderAsync);
         RunOfflineTestCommand = new AsyncRelayCommand(RunOfflineTestAsync);
+        BrowseOfflineImageCommand = new RelayCommand(BrowseOfflineImage);
         SaveOfflineMiningEditsCommand = new AsyncRelayCommand(SaveOfflineMiningEditsAsync, () => SelectedOfflineMiningResult is not null);
         AddOfflineMiningRowCommand = new RelayCommand(AddOfflineMiningRow, () => SelectedOfflineMiningResult is not null);
         DeleteOfflineMiningRowCommand = new RelayCommand<OfflineMiningElementEditRow>(DeleteOfflineMiningRow);
@@ -2067,6 +2069,21 @@ public partial class MainViewModel : ObservableObject, IDisposable
         Status = $"Replay complete. CSV saved to {outputPath}";
     }
 
+    private void BrowseOfflineImage()
+    {
+        using var dialog = new WinForms.OpenFileDialog
+        {
+            Title = "Select Offline Test Images",
+            Filter = "Image Files|*.png;*.jpg;*.jpeg;*.bmp|All Files|*.*",
+            Multiselect = true
+        };
+
+        if (dialog.ShowDialog() == WinForms.DialogResult.OK)
+        {
+            LoadOfflineTestImages(dialog.FileNames);
+        }
+    }
+
     public void LoadOfflineTestImages(IEnumerable<string> imagePaths)
     {
         var validImagePaths = imagePaths
@@ -2201,11 +2218,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private async Task RunOfflineScanBatchAsync()
     {
         var region = GetCaptureRegion(OfflineSelectedCaptureProfile);
-        if (!region.IsValid)
-        {
-            Status = $"Set the {GetCaptureProfileLabel(OfflineSelectedCaptureProfile)} region first.";
-            return;
-        }
 
         OfflineScanResults.Clear();
         SelectedOfflineScanResult = null;
@@ -2305,6 +2317,11 @@ public partial class MainViewModel : ObservableObject, IDisposable
                     $"Failed: {ex.Message}",
                     "Selection mode: unavailable"));
             }
+
+            if (processedCount < OfflineInputImages.Count)
+            {
+                await Task.Delay(1500);
+            }
         }
 
         SelectedOfflineScanResult = OfflineScanResults.FirstOrDefault(item => SelectedOfflineInputImage is not null
@@ -2319,11 +2336,6 @@ public partial class MainViewModel : ObservableObject, IDisposable
     private async Task RunOfflineMiningBatchAsync()
     {
         var region = GetCaptureRegion(OfflineSelectedCaptureProfile);
-        if (!region.IsValid)
-        {
-            Status = $"Set the {GetCaptureProfileLabel(OfflineSelectedCaptureProfile)} region first.";
-            return;
-        }
 
         OfflineMiningResults.Clear();
         SelectedOfflineMiningResult = null;
@@ -2335,58 +2347,84 @@ public partial class MainViewModel : ObservableObject, IDisposable
         {
             Status = $"Running offline OCR {processedCount + 1}/{OfflineInputImages.Count}: {inputImage.DisplayName}";
 
-            using var sourceBitmap = new Bitmap(inputImage.FilePath);
-            if (!TryGetOfflineCropBounds(region, sourceBitmap.Width, sourceBitmap.Height, out var cropBounds, out var useWholeImage, out var errorMessage))
+            try
             {
-                Status = $"Skipped {inputImage.DisplayName}: {errorMessage}";
-                continue;
+                using var sourceBitmap = new Bitmap(inputImage.FilePath);
+                if (!TryGetOfflineCropBounds(region, sourceBitmap.Width, sourceBitmap.Height, out var cropBounds, out var useWholeImage, out var errorMessage))
+                {
+                    Status = $"Skipped {inputImage.DisplayName}: {errorMessage}";
+                    continue;
+                }
+
+                var debugOutputDirectory = CreateOfflineDebugOutputDirectory(OfflineSelectedCaptureProfile);
+                using var croppedBitmap = sourceBitmap.Clone(cropBounds, sourceBitmap.PixelFormat);
+
+                if (debugOutputDirectory is not null)
+                {
+                    SaveOfflineDebugArtifacts(debugOutputDirectory, inputImage.FilePath, sourceBitmap, croppedBitmap, cropBounds, useWholeImage);
+                }
+
+                var miningOcr = await ExtractMiningOcrAsync(croppedBitmap, debugOutputDirectory, SelectedOcrMode, SelectedMiningOcrStrategy);
+                LastUsedOcrMode = $"Last OCR mode: {OcrModeCatalog.GetDisplayName(miningOcr.OcrResult.UsedMode)}";
+                LastOcrSourceSummary = GetOcrSourceSummary(miningOcr.OcrResult.UsedMode, OfflineSelectedCaptureProfile);
+
+                var scan = BuildOfflineMiningScan(miningOcr.OcrResult.NormalizedText, inputImage.FilePath, debugOutputDirectory);
+                string? csvPath = null;
+                string? jsonPath = null;
+
+                if (HasMeaningfulMiningData(scan))
+                {
+                    jsonPath = RockScanJsonStore.Save(scan);
+                    csvPath = RockScanCsvStore.Append(scan);
+                    savedCount++;
+                }
+                else if (!string.IsNullOrWhiteSpace(debugOutputDirectory))
+                {
+                    jsonPath = RockScanJsonStore.Save(scan);
+                }
+
+                var resultItem = new OfflineMiningResultItem(
+                    inputImage.FilePath,
+                    miningOcr.ProcessedImagePath ?? Path.Combine(debugOutputDirectory ?? string.Empty, "01_capture.png"),
+                    scan,
+                    RockScanParser.BuildSummary(scan),
+                    jsonPath,
+                    csvPath,
+                    persistCallback: (item, previousScan, updatedScan) => PersistMiningSessionHistoryFromItem(item, previousScan, updatedScan));
+
+                OfflineMiningResults.Add(resultItem);
+                resultItem.UsedOcrModeSummary = OcrModeCatalog.GetDisplayName(miningOcr.OcrResult.UsedMode);
+                resultItem.OcrSourceSummary = GetOcrSourceSummary(miningOcr.OcrResult.UsedMode, OfflineSelectedCaptureProfile);
+                PersistMiningSessionHistoryFromItem(resultItem);
+                if (HasMeaningfulMiningData(scan))
+                {
+                    IncrementMiningStats(scan);
+                }
+                processedCount++;
+            }
+            catch (Exception ex)
+            {
+                var failedScan = new RockScan
+                {
+                    SessionId = App.SessionId,
+                    TimestampUtc = DateTime.UtcNow,
+                    Elements = Array.Empty<RockCompositionEntry>(),
+                    SourceText = $"Failed: {ex.Message}",
+                    ParseWarnings = new[] { $"Processing failed: {ex.Message}" }
+                };
+                OfflineMiningResults.Add(new OfflineMiningResultItem(
+                    inputImage.FilePath,
+                    inputImage.FilePath,
+                    failedScan,
+                    $"Failed: {ex.Message}",
+                    null,
+                    null));
             }
 
-            var debugOutputDirectory = CreateOfflineDebugOutputDirectory(OfflineSelectedCaptureProfile);
-            using var croppedBitmap = sourceBitmap.Clone(cropBounds, sourceBitmap.PixelFormat);
-
-            if (debugOutputDirectory is not null)
+            if (processedCount < OfflineInputImages.Count)
             {
-                SaveOfflineDebugArtifacts(debugOutputDirectory, inputImage.FilePath, sourceBitmap, croppedBitmap, cropBounds, useWholeImage);
+                await Task.Delay(1500);
             }
-
-            var miningOcr = await ExtractMiningOcrAsync(croppedBitmap, debugOutputDirectory, SelectedOcrMode, SelectedMiningOcrStrategy);
-            LastUsedOcrMode = $"Last OCR mode: {OcrModeCatalog.GetDisplayName(miningOcr.OcrResult.UsedMode)}";
-            LastOcrSourceSummary = GetOcrSourceSummary(miningOcr.OcrResult.UsedMode, OfflineSelectedCaptureProfile);
-
-            var scan = BuildOfflineMiningScan(miningOcr.OcrResult.NormalizedText, inputImage.FilePath, debugOutputDirectory);
-            string? csvPath = null;
-            string? jsonPath = null;
-
-            if (HasMeaningfulMiningData(scan))
-            {
-                jsonPath = RockScanJsonStore.Save(scan);
-                csvPath = RockScanCsvStore.Append(scan);
-                savedCount++;
-            }
-            else if (!string.IsNullOrWhiteSpace(debugOutputDirectory))
-            {
-                jsonPath = RockScanJsonStore.Save(scan);
-            }
-
-            var resultItem = new OfflineMiningResultItem(
-                inputImage.FilePath,
-                miningOcr.ProcessedImagePath ?? Path.Combine(debugOutputDirectory ?? string.Empty, "01_capture.png"),
-                scan,
-                RockScanParser.BuildSummary(scan),
-                jsonPath,
-                csvPath,
-                persistCallback: (item, previousScan, updatedScan) => PersistMiningSessionHistoryFromItem(item, previousScan, updatedScan));
-
-            OfflineMiningResults.Add(resultItem);
-            resultItem.UsedOcrModeSummary = OcrModeCatalog.GetDisplayName(miningOcr.OcrResult.UsedMode);
-            resultItem.OcrSourceSummary = GetOcrSourceSummary(miningOcr.OcrResult.UsedMode, OfflineSelectedCaptureProfile);
-            PersistMiningSessionHistoryFromItem(resultItem);
-            if (HasMeaningfulMiningData(scan))
-            {
-                IncrementMiningStats(scan);
-            }
-            processedCount++;
         }
 
         SelectedOfflineMiningResult = OfflineMiningResults.FirstOrDefault();
@@ -2569,7 +2607,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             return false;
         }
 
-        if (region.X < 0 || region.Y < 0 || region.X + region.Width > imageWidth || region.Y + region.Height > imageHeight)
+        if (!region.IsValid || region.X < 0 || region.Y < 0 || region.X + region.Width > imageWidth || region.Y + region.Height > imageHeight)
         {
             cropBounds = new System.Drawing.Rectangle(0, 0, imageWidth, imageHeight);
             useWholeImage = true;

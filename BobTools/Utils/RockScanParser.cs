@@ -9,7 +9,7 @@ internal static class RockScanParser
     private static readonly Regex MassPattern = new(@"MASS:\s*(?<value>\d{2,6})", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex ResistancePattern = new(@"RESISTANCE:\s*(?<value>\d{1,3}(?:[\.,]\d{1,2})?)\s*%", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex InstabilityPattern = new(@"INSTABILITY:\s*(?<value>\d{1,3}(?:[\.,]\d{1,2})?)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-    private static readonly Regex CompositionPattern = new(@"COMPOSITION:\s*(?<value>\d{1,3}(?:[\.,]\d{1,2})?)\s*%?", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex CompositionPattern = new(@"COMPOSITION(?:[:;\s]+)(?<value>\d{1,6}(?:[\.,]\d{1,2})?)\s*(?:%|SCU|5CU)?", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex CompositionLinePattern = new(@"^\s*(?<pct>\d{1,3}(?:[\.,]\d{1,2})?)%\s+(?<material>[A-Z][A-Z0-9\-\s]+?(?:\s*\([A-Z\-\s]+\))?)\s+(?<qty>\d{1,4})\s*[:;'\]\[]*$", RegexOptions.Compiled);
     private static readonly Regex PercentageMaterialLinePattern = new(@"^\s*(?<pct>[A-Z0-9]{1,3}(?:[\.,]\d{1,2})?)%\s+(?<material>[A-Z][A-Z0-9\-\s]+?(?:\s*\([A-Z\-\s]+\))?)\s*[:;'\]\[]*$", RegexOptions.Compiled);
     private static readonly Regex MaterialLinePattern = new(@"^[A-Z][A-Z\-\s]+(?:\([A-Z\-\s]+\))?$", RegexOptions.Compiled);
@@ -156,7 +156,7 @@ internal static class RockScanParser
     {
         var entries = new List<RockCompositionEntry>();
         var lineList = lines.ToList();
-        var compositionIndex = lineList.FindIndex(line => string.Equals(line, "COMPOSITION", StringComparison.OrdinalIgnoreCase));
+        var compositionIndex = lineList.FindIndex(line => line.StartsWith("COMPOSITION", StringComparison.OrdinalIgnoreCase));
         if (compositionIndex < 0)
         {
             compositionIndex = 0;
@@ -181,10 +181,13 @@ internal static class RockScanParser
                     continue;
                 }
 
+                var rawQuality = TryParseInteger(NormalizeQuantityToken(match.Groups["qty"].Value));
+                var quality = rawQuality >= 100 ? rawQuality : null;
+
                 entries.Add(new RockCompositionEntry(
                     NormalizeMaterialName(match.Groups["material"].Value, warnings),
                     percentage.Value,
-                    TryParseInteger(NormalizeQuantityToken(match.Groups["qty"].Value))));
+                    quality));
 
                 stagedPercentage = null;
                 currentEntry = null;
@@ -199,7 +202,8 @@ internal static class RockScanParser
 
                     if (currentEntry.Quality is not null)
                     {
-                        entries.Add(new RockCompositionEntry(currentEntry.Material, currentEntry.Percentage, currentEntry.Quality));
+                        var qty = currentEntry.Quality >= 100 ? currentEntry.Quality : null;
+                        entries.Add(new RockCompositionEntry(currentEntry.Material, currentEntry.Percentage, qty));
                         currentEntry = null;
                     }
                 }
@@ -215,7 +219,8 @@ internal static class RockScanParser
             {
                 if (currentEntry is not null)
                 {
-                    entries.Add(new RockCompositionEntry(currentEntry.Material, currentEntry.Percentage, currentEntry.Quality));
+                    var qty = currentEntry.Quality >= 100 ? currentEntry.Quality : null;
+                    entries.Add(new RockCompositionEntry(currentEntry.Material, currentEntry.Percentage, qty));
                     warnings.Add(BuildPartialCompositionWarning(currentEntry));
                 }
 
@@ -228,7 +233,8 @@ internal static class RockScanParser
             {
                 if (currentEntry is not null)
                 {
-                    entries.Add(new RockCompositionEntry(currentEntry.Material, currentEntry.Percentage, currentEntry.Quality));
+                    var qty = currentEntry.Quality >= 100 ? currentEntry.Quality : null;
+                    entries.Add(new RockCompositionEntry(currentEntry.Material, currentEntry.Percentage, qty));
                     warnings.Add(BuildPartialCompositionWarning(currentEntry));
                 }
 
@@ -239,7 +245,8 @@ internal static class RockScanParser
 
             if (currentEntry is not null && TryParseQuantityLine(line, out var quantity))
             {
-                currentEntry = currentEntry with { Quality = quantity };
+                var filteredQuantity = quantity >= 100 ? quantity : null;
+                currentEntry = currentEntry with { Quality = filteredQuantity };
 
                 if (currentEntry.Percentage is not null)
                 {
@@ -251,7 +258,8 @@ internal static class RockScanParser
 
         if (currentEntry is not null)
         {
-            entries.Add(new RockCompositionEntry(currentEntry.Material, currentEntry.Percentage, currentEntry.Quality));
+            var qty = currentEntry.Quality >= 100 ? currentEntry.Quality : null;
+            entries.Add(new RockCompositionEntry(currentEntry.Material, currentEntry.Percentage, qty));
             warnings.Add(BuildPartialCompositionWarning(currentEntry));
         }
 
@@ -286,6 +294,16 @@ internal static class RockScanParser
             for (var lookahead = 1; lookahead <= 2; lookahead++)
             {
                 var nextIndex = index + lookahead;
+                
+                if (nextIndex < lines.Count)
+                {
+                    var match = Regex.Match(lines[nextIndex], @"^(?<value>\d{1,6}(?:[\.,]\d{1,2})?)\s*(?:%|SCU|5CU)?$", RegexOptions.IgnoreCase);
+                    if (match.Success)
+                    {
+                        var val = TryParseDecimal(match.Groups["value"].Value);
+                        if (val is not null) return val;
+                    }
+                }
                 if (nextIndex < lines.Count && TryParsePercentageLine(lines[nextIndex], out var value))
                 {
                     warnings.Add("Composition was reconstructed from a nearby OCR line instead of the same line as COMPOSITION:.");
@@ -434,6 +452,13 @@ internal static class RockScanParser
             .Trim();
 
         normalized = Regex.Replace(normalized, "\\s+", " ");
+        
+        // Fix fused text from OCR overlaps (e.g. "(RAW428" -> "(RAW) 428")
+        normalized = Regex.Replace(normalized, @"\(RAW\)?\s*[:;'\]\[]*(\d{1,4})(?!\d)", "(RAW) $1", RegexOptions.IgnoreCase);
+        
+        // Close missing parentheses at end of line (e.g. "HEPHAESTANITE (RAW" -> "HEPHAESTANITE (RAW)")
+        normalized = Regex.Replace(normalized, @"\(RAW$", "(RAW)", RegexOptions.IgnoreCase);
+
         if (PercentageOnlyPattern.IsMatch(normalized))
         {
             var match = PercentageOnlyPattern.Match(normalized);

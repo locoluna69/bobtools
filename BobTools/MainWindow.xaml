@@ -1247,6 +1247,7 @@
                                     </DataTemplate>
                                 </ComboBox.ItemTemplate>
                             </ComboBox>
+                            <Button Width="100" Margin="0,0,8,8" Content="Browse..." Command="{Binding BrowseOfflineImageCommand}" />
                             <Button Width="120" Margin="0,0,8,8" Content="Run OCR Test" Command="{Binding RunOfflineTestCommand}" />
                                 <Button Width="120"
                                     Margin="0,0,8,8"

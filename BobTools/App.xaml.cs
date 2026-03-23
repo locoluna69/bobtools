@@ -13,7 +13,46 @@ public partial class App : System.Windows.Application
 		DispatcherUnhandledException += OnDispatcherUnhandledException;
 		AppDomain.CurrentDomain.UnhandledException += OnCurrentDomainUnhandledException;
 		TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+
+		LoadEncryptedEnv();
+
 		base.OnStartup(e);
+	}
+
+	private static void LoadEncryptedEnv()
+	{
+		var envPath = Path.Combine(AppContext.BaseDirectory, ".env.enc");
+		if (!File.Exists(envPath)) return;
+
+		try
+		{
+			var bytes = File.ReadAllBytes(envPath);
+			var key = Encoding.UTF8.GetBytes("BobToolsKey12345"); // 16 bytes
+			var iv = Encoding.UTF8.GetBytes("BobToolsIV123456"); // 16 bytes
+
+			using var aes = System.Security.Cryptography.Aes.Create();
+			aes.Key = key;
+			aes.IV = iv;
+
+			using var decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
+			using var ms = new MemoryStream(bytes);
+			using var cs = new System.Security.Cryptography.CryptoStream(ms, decryptor, System.Security.Cryptography.CryptoStreamMode.Read);
+			using var sr = new StreamReader(cs);
+
+			var content = sr.ReadToEnd();
+			foreach (var line in content.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+			{
+				var parts = line.Split('=', 2);
+				if (parts.Length == 2)
+				{
+					Environment.SetEnvironmentVariable(parts[0].Trim(), parts[1].Trim());
+				}
+			}
+		}
+		catch (Exception ex)
+		{
+			WriteUnhandledExceptionLog("LoadEncryptedEnv", ex);
+		}
 	}
 
 	private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
