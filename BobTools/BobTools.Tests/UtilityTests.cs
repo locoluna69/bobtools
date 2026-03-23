@@ -16,7 +16,7 @@ public sealed class UtilityTests
         Assert.Contains(options, option => string.Equals(option.DisplayName, "RAB-KILO", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(options, option => string.Equals(option.DisplayName, "Mining Base #E38-S5G", StringComparison.OrdinalIgnoreCase));
 
-        var rabKilo = Assert.Single(options.Where(option => string.Equals(option.DisplayName, "RAB-KILO", StringComparison.OrdinalIgnoreCase)));
+        var rabKilo = Assert.Single(options, option => string.Equals(option.DisplayName, "RAB-KILO", StringComparison.OrdinalIgnoreCase));
         Assert.Equal("Pyro", rabKilo.SystemName);
         Assert.Contains("RAB-KILO", rabKilo.DisplayPath, StringComparison.OrdinalIgnoreCase);
         Assert.StartsWith("Pyro /", rabKilo.DisplayPath, StringComparison.OrdinalIgnoreCase);
