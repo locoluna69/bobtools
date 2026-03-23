@@ -1,5 +1,7 @@
 using BobTools.Models;
 using BobTools.Utils;
+using System.Reflection;
+using System.Windows.Media.Imaging;
 using Xunit;
 
 namespace BobTools.Tests;
@@ -76,6 +78,28 @@ public sealed class UtilityTests
         Assert.Equal(ScanReviewCatalog.Pending, item.ReviewStatus);
         Assert.Null(item.ExportedAtUtc);
         Assert.Equal(string.Empty, item.ExportBatchId);
+    }
+
+    [Fact]
+    public void OfflineMiningResultItem_CompactMetricsSummary_ShowsCompositionAsDecimal()
+    {
+        var item = new OfflineMiningResultItem(
+            sourceImagePath: Path.Combine(Path.GetTempPath(), "compact-metrics.png"),
+            processedImagePath: null,
+            extractedScan: new RockScan
+            {
+                Material = "Quantanium",
+                Mass = 4500,
+                Resistance = 42.5m,
+                Instability = 0.35m,
+                Composition = 24.43m
+            },
+            summary: "Summary",
+            jsonPath: null,
+            csvPath: null);
+
+        Assert.Contains("Comp 24.43", item.CompactMetricsSummary);
+        Assert.DoesNotContain("Comp 24.43%", item.CompactMetricsSummary);
     }
 
     [Fact]
@@ -157,7 +181,88 @@ COMPOSITION: 12.5%
         Assert.Equal("Quantanium", element.Element);
         Assert.Equal(12.5m, element.Percentage);
         Assert.Equal(950, element.Quality);
-        Assert.Contains("Quantanium", RockScanParser.BuildSummary(result));
+        var summary = RockScanParser.BuildSummary(result);
+        Assert.Contains("Quantanium", summary);
+        Assert.Contains("Composition 12.5", summary);
+        Assert.DoesNotContain("Composition 12.5%", summary);
+    }
+
+    [Fact]
+    public void PngMetadataWriter_BuildMetadata_WritesExpectedImageProperties()
+    {
+        var sessionMetadata = new SessionMetadata
+        {
+            RsiHandle = "pilot",
+            Ship = "Prospector",
+            StarSystem = "Pyro",
+            LocationKey = "pyro-ruin-station",
+            LocationName = "Ruin Station",
+            LocationPath = "Pyro / Ruin Station"
+        };
+
+        var metadata = BuildMetadataForTest(
+            sessionMetadata,
+            "session-123",
+            CaptureProfileCatalog.Mining,
+            "source",
+            new Dictionary<string, string?>
+            {
+                ["BobTools.SourceType"] = "live",
+                ["BobTools.SourceImagePath"] = "captures/mine_001.png"
+            });
+
+        Assert.Equal("BobTools", GetMetadataQueryValue(metadata, "/xmp/xmp:CreatorTool"));
+        Assert.Equal("session-123", GetMetadataQueryValue(metadata, "/xmp/BobTools:SessionId"));
+        Assert.Equal("pilot", GetMetadataQueryValue(metadata, "/xmp/BobTools:RsiHandle"));
+        Assert.Equal("Prospector", GetMetadataQueryValue(metadata, "/xmp/BobTools:Ship"));
+        Assert.Equal("Pyro", GetMetadataQueryValue(metadata, "/xmp/BobTools:StarSystem"));
+        Assert.Equal("pyro-ruin-station", GetMetadataQueryValue(metadata, "/xmp/BobTools:LocationKey"));
+        Assert.Equal("Ruin Station", GetMetadataQueryValue(metadata, "/xmp/BobTools:LocationName"));
+        Assert.Equal("Pyro / Ruin Station", GetMetadataQueryValue(metadata, "/xmp/BobTools:LocationPath"));
+        Assert.Equal(CaptureProfileCatalog.Mining, GetMetadataQueryValue(metadata, "/xmp/BobTools:CaptureProfile"));
+        Assert.Equal("source", GetMetadataQueryValue(metadata, "/xmp/BobTools:ImageRole"));
+        Assert.Equal("live", GetMetadataQueryValue(metadata, "/xmp/BobTools:SourceType"));
+        Assert.Equal("captures/mine_001.png", GetMetadataQueryValue(metadata, "/xmp/BobTools:SourceImagePath"));
+
+        var timestampText = GetMetadataQueryValue(metadata, "/xmp/xmp:CreateDate");
+        Assert.True(DateTime.TryParse(timestampText, out _));
+    }
+
+    [Fact]
+    public void PngMetadataWriter_BuildMetadata_WritesExpectedXmpProperties()
+    {
+        var sessionMetadata = new SessionMetadata
+        {
+            RsiHandle = "miner-01",
+            Ship = "MOLE",
+            StarSystem = "Stanton",
+            LocationKey = "stanton-aaron-halo",
+            LocationName = "Aaron Halo",
+            LocationPath = "Stanton / Aaron Halo"
+        };
+
+        var metadata = BuildMetadataForTest(
+            sessionMetadata,
+            "session-456",
+            CaptureProfileCatalog.Signature,
+            "processed",
+            new Dictionary<string, string?>
+            {
+                ["BobTools.SourceType"] = "offline"
+            });
+
+        Assert.Equal("BobTools", GetMetadataQueryValue(metadata, "/xmp/xmp:CreatorTool"));
+        Assert.Equal("session-456", GetMetadataQueryValue(metadata, "/xmp/BobTools:SessionId"));
+        Assert.Equal("miner-01", GetMetadataQueryValue(metadata, "/xmp/BobTools:RsiHandle"));
+        Assert.Equal("MOLE", GetMetadataQueryValue(metadata, "/xmp/BobTools:Ship"));
+        Assert.Equal("Stanton", GetMetadataQueryValue(metadata, "/xmp/BobTools:StarSystem"));
+        Assert.Equal("stanton-aaron-halo", GetMetadataQueryValue(metadata, "/xmp/BobTools:LocationKey"));
+        Assert.Equal("Aaron Halo", GetMetadataQueryValue(metadata, "/xmp/BobTools:LocationName"));
+        Assert.Equal("Stanton / Aaron Halo", GetMetadataQueryValue(metadata, "/xmp/BobTools:LocationPath"));
+        Assert.Equal(CaptureProfileCatalog.Signature, GetMetadataQueryValue(metadata, "/xmp/BobTools:CaptureProfile"));
+        Assert.Equal("processed", GetMetadataQueryValue(metadata, "/xmp/BobTools:ImageRole"));
+        Assert.Equal("offline", GetMetadataQueryValue(metadata, "/xmp/BobTools:SourceType"));
+        Assert.True(DateTime.TryParse(GetMetadataQueryValue(metadata, "/xmp/xmp:CreateDate"), out _));
     }
 
     private static async Task WaitForConditionAsync(Func<bool> condition, TimeSpan timeout)
@@ -174,6 +279,25 @@ COMPOSITION: 12.5%
         }
 
         Assert.True(condition(), "Timed out waiting for the expected autosave state.");
+    }
+
+    private static BitmapMetadata BuildMetadataForTest(
+        SessionMetadata sessionMetadata,
+        string sessionId,
+        string captureProfile,
+        string imageRole,
+        IReadOnlyDictionary<string, string?>? extraMetadata = null)
+    {
+        var method = typeof(PngMetadataWriter).GetMethod("BuildMetadata", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var metadata = method!.Invoke(null, [sessionMetadata, sessionId, captureProfile, imageRole, extraMetadata]);
+        return Assert.IsType<BitmapMetadata>(metadata);
+    }
+
+    private static string GetMetadataQueryValue(BitmapMetadata metadata, string query)
+    {
+        return metadata.GetQuery(query) as string ?? string.Empty;
     }
 
     private sealed class TemporaryWorkspace : IDisposable

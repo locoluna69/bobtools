@@ -1352,12 +1352,13 @@ public partial class MainViewModel : ObservableObject, IDisposable
             DebugFolderPath = entry.DebugFolderPath,
             SourceText = entry.OcrText
         };
+        var restoredSummary = RockScanParser.BuildSummary(restoredScan);
 
         var resultItem = new OfflineMiningResultItem(
             sourceImagePath,
             entry.ProcessedImagePath ?? sourceImagePath,
             restoredScan,
-            entry.Mining?.Summary ?? entry.ProcessingState,
+            restoredSummary,
             null,
             null,
             message => Status = message,
@@ -1411,7 +1412,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             clonedEntry.SourceImagePath = sourceImagePath;
             clonedEntry.Mining = new MiningSessionPayload
             {
-                Summary = entry.Mining?.Summary ?? entry.ProcessingState,
+                Summary = RockScanParser.BuildSummary(mergedRockScan),
                 RockScan = mergedRockScan
             };
 
