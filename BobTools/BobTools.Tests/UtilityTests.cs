@@ -7,6 +7,22 @@ namespace BobTools.Tests;
 public sealed class UtilityTests
 {
     [Fact]
+    public void MiningContextCatalog_GetLocationOptions_IncludesPlanetsStationsAndPois()
+    {
+        var options = MiningContextCatalog.GetLocationOptions();
+
+        Assert.Contains(options, option => string.Equals(option.DisplayName, "Terminus", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(options, option => string.Equals(option.DisplayName, "HUR-L1", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(options, option => string.Equals(option.DisplayName, "RAB-KILO", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(options, option => string.Equals(option.DisplayName, "Mining Base #E38-S5G", StringComparison.OrdinalIgnoreCase));
+
+        var rabKilo = Assert.Single(options.Where(option => string.Equals(option.DisplayName, "RAB-KILO", StringComparison.OrdinalIgnoreCase)));
+        Assert.Equal("Pyro", rabKilo.SystemName);
+        Assert.Contains("RAB-KILO", rabKilo.DisplayPath, StringComparison.OrdinalIgnoreCase);
+        Assert.StartsWith("Pyro /", rabKilo.DisplayPath, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task OfflineMiningResultItem_ReviewEdit_AutoSavesWithoutManualCommand()
     {
         using var workspace = new TemporaryWorkspace();

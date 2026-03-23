@@ -97,10 +97,10 @@ internal static class MiningContextCatalog
         var planets = LoadJsonRows("planets.json");
         var moons = LoadJsonRows("moons.json");
         var stations = LoadJsonRows("space_stations.json");
+        var pois = LoadJsonRows("poi.json");
 
         var planetLookup = planets
             .Where(IsAvailableAndVisible)
-            .Where(row => GetInt32(row, "is_planet") == 1)
             .Select(row => new
             {
                 Id = GetInt32(row, "id"),
@@ -195,6 +195,56 @@ internal static class MiningContextCatalog
                     locationName,
                     GetString(station, "name"),
                     GetString(station, "orbit_name"))
+            });
+        }
+
+        foreach (var poi in pois.Where(IsAvailableAndVisible).Where(row => GetInt32(row, "is_decommissioned") == 0))
+        {
+            var systemName = GetString(poi, "star_system_name");
+            var poiId = GetInt32(poi, "id");
+            if (string.IsNullOrWhiteSpace(systemName) || poiId <= 0)
+            {
+                continue;
+            }
+
+            var locationName = FirstNonEmpty(
+                GetString(poi, "nickname"),
+                GetString(poi, "name"),
+                GetString(poi, "outpost_name"),
+                GetString(poi, "city_name"),
+                GetString(poi, "space_station_name"));
+
+            if (string.IsNullOrWhiteSpace(locationName))
+            {
+                continue;
+            }
+
+            var planetName = GetString(poi, "planet_name");
+            var moonName = GetString(poi, "moon_name");
+            var spaceStationName = GetString(poi, "space_station_name");
+            var cityName = GetString(poi, "city_name");
+            var outpostName = GetString(poi, "outpost_name");
+            var orbitName = GetString(poi, "orbit_name");
+
+            locations.Add(new MiningLocationOption
+            {
+                Key = $"poi:{poiId}",
+                SystemName = systemName,
+                DisplayName = locationName,
+                DisplayPath = BuildPoiPath(systemName, planetName, moonName, spaceStationName, cityName, outpostName, orbitName, locationName),
+                SearchText = BuildSearchText(
+                    systemName,
+                    planetName,
+                    moonName,
+                    spaceStationName,
+                    cityName,
+                    outpostName,
+                    orbitName,
+                    locationName,
+                    GetString(poi, "name"),
+                    GetString(poi, "nickname"),
+                    GetString(poi, "type"),
+                    GetString(poi, "subtype"))
             });
         }
 
@@ -307,9 +357,47 @@ internal static class MiningContextCatalog
         return $"{systemName} / {locationName}";
     }
 
+    private static string BuildPoiPath(
+        string systemName,
+        string? planetName,
+        string? moonName,
+        string? spaceStationName,
+        string? cityName,
+        string? outpostName,
+        string? orbitName,
+        string locationName)
+    {
+        var segments = new List<string> { systemName };
+
+        AppendDistinctSegment(segments, planetName);
+        AppendDistinctSegment(segments, moonName);
+        AppendDistinctSegment(segments, spaceStationName);
+        AppendDistinctSegment(segments, cityName);
+        AppendDistinctSegment(segments, outpostName);
+        AppendDistinctSegment(segments, orbitName);
+        AppendDistinctSegment(segments, locationName);
+
+        return string.Join(" / ", segments);
+    }
+
     private static string BuildSearchText(params string?[] parts)
     {
         return string.Join(' ', parts.Where(part => !string.IsNullOrWhiteSpace(part))).Trim();
+    }
+
+    private static void AppendDistinctSegment(ICollection<string> segments, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        if (segments.Any(existing => string.Equals(existing, value, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        segments.Add(value);
     }
 
     private static string? FirstNonEmpty(params string?[] values)
