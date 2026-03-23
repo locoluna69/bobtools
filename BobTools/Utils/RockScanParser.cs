@@ -116,7 +116,7 @@ internal static class RockScanParser
 
         if (rockScan.Composition is not null)
         {
-            parts.Add($"Composition {rockScan.Composition:0.##}%");
+            parts.Add($"Composition {rockScan.Composition:0.##}");
         }
 
         if (rockScan.Elements.Count > 0)
