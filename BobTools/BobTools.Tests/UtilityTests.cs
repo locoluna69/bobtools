@@ -7,6 +7,62 @@ namespace BobTools.Tests;
 public sealed class UtilityTests
 {
     [Fact]
+    public async Task OfflineMiningResultItem_ReviewEdit_AutoSavesWithoutManualCommand()
+    {
+        using var workspace = new TemporaryWorkspace();
+
+        RockScan? previousPersistedScan = null;
+        RockScan? updatedPersistedScan = null;
+        var persistCallCount = 0;
+
+        var item = new OfflineMiningResultItem(
+            sourceImagePath: Path.Combine(workspace.RootPath, "capture.png"),
+            processedImagePath: null,
+            extractedScan: new RockScan
+            {
+                Id = "scan-1",
+                SessionId = "session-1",
+                TimestampUtc = new DateTime(2026, 3, 22, 18, 0, 0, DateTimeKind.Utc),
+                Material = "Quantanium",
+                Mass = 4500,
+                Resistance = 42.5m,
+                Instability = 0.35m,
+                Composition = 12.5m,
+                Location = "Lyria",
+                Elements =
+                [
+                    new RockCompositionEntry("Quantanium", 12.5m, 950)
+                ]
+            },
+            summary: "Initial summary",
+            jsonPath: null,
+            csvPath: null,
+            persistCallback: (_, previousScan, updatedScan) =>
+            {
+                Interlocked.Increment(ref persistCallCount);
+                previousPersistedScan = previousScan;
+                updatedPersistedScan = updatedScan;
+            },
+            enableAutoSave: true);
+
+        item.ApplyReviewMetadata(ScanReviewCatalog.Reviewed, DateTime.UtcNow, "batch-1");
+        item.ReviewStatus = ScanReviewCatalog.Pending;
+
+        await WaitForConditionAsync(
+            () => Volatile.Read(ref persistCallCount) == 1 && string.Equals(item.AutoSaveStatus, "Saved", StringComparison.Ordinal),
+            TimeSpan.FromSeconds(5));
+
+        Assert.Equal(1, persistCallCount);
+        Assert.Null(previousPersistedScan);
+        Assert.Null(updatedPersistedScan);
+        Assert.False(item.IsDirty);
+        Assert.Equal("Saved", item.AutoSaveStatus);
+        Assert.Equal(ScanReviewCatalog.Pending, item.ReviewStatus);
+        Assert.Null(item.ExportedAtUtc);
+        Assert.Equal(string.Empty, item.ExportBatchId);
+    }
+
+    [Fact]
     public void OreQualityTierCatalog_CountTiersAndFormatDescriptor_ReturnExpectedValues()
     {
         var entries = new[]
@@ -86,5 +142,68 @@ COMPOSITION: 12.5%
         Assert.Equal(12.5m, element.Percentage);
         Assert.Equal(950, element.Quality);
         Assert.Contains("Quantanium", RockScanParser.BuildSummary(result));
+    }
+
+    private static async Task WaitForConditionAsync(Func<bool> condition, TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (condition())
+            {
+                return;
+            }
+
+            await Task.Delay(50);
+        }
+
+        Assert.True(condition(), "Timed out waiting for the expected autosave state.");
+    }
+
+    private sealed class TemporaryWorkspace : IDisposable
+    {
+        public TemporaryWorkspace()
+        {
+            RootPath = Path.Combine(Path.GetTempPath(), "BobTools.Tests", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(RootPath);
+        }
+
+        public string RootPath { get; }
+
+        public void Dispose()
+        {
+            if (!Directory.Exists(RootPath))
+            {
+                return;
+            }
+
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+
+            for (var attempt = 0; attempt < 5; attempt++)
+            {
+                try
+                {
+                    Directory.Delete(RootPath, recursive: true);
+                    break;
+                }
+                catch (IOException) when (attempt < 4)
+                {
+                    Thread.Sleep(100);
+                }
+                catch (UnauthorizedAccessException) when (attempt < 4)
+                {
+                    Thread.Sleep(100);
+                }
+                catch (IOException)
+                {
+                    break;
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    break;
+                }
+            }
+        }
     }
 }

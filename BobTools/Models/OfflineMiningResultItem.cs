@@ -73,7 +73,6 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
         this.csvPath = csvPath;
         this.processingState = processingState;
         this.isProcessing = isProcessing;
-        SaveCommand = new AsyncRelayCommand(SaveAsync, CanSave);
         AddRowCommand = new RelayCommand(AddRow, CanAddRow);
         DeleteRowCommand = new RelayCommand<OfflineMiningElementEditRow>(DeleteRow);
         _savedSnapshot = BuildSnapshot();
@@ -84,8 +83,6 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
     public string SourceImagePath { get; }
 
     public ImageSource? DisplayPreviewImage => SourcePreviewImage ?? ProcessedPreviewImage;
-
-    public IAsyncRelayCommand SaveCommand { get; }
 
     public IRelayCommand AddRowCommand { get; }
 
@@ -384,7 +381,6 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
 
     partial void OnIsProcessingChanged(bool value)
     {
-        SaveCommand.NotifyCanExecuteChanged();
         AddRowCommand.NotifyCanExecuteChanged();
     }
 
@@ -507,19 +503,9 @@ public sealed partial class OfflineMiningResultItem : ObservableObject
         OnCompactDisplayChanged();
     }
 
-    private bool CanSave()
-    {
-        return !IsProcessing;
-    }
-
     private bool CanAddRow()
     {
         return !IsProcessing;
-    }
-
-    private async Task SaveAsync()
-    {
-        await SaveAsyncInternal();
     }
 
     private void AddRow()

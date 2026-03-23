@@ -1058,11 +1058,6 @@
 
                                                         <WrapPanel Margin="0,0,0,8">
                                                             <Button Content="Add Row" Width="100" Margin="0,0,8,0" Command="{Binding AddRowCommand}" />
-                                                            <Button Content="Save Result"
-                                                                    Width="110"
-                                                                    Command="{Binding SaveCommand}"
-                                                                    Style="{StaticResource DirtyAwareSaveButtonStyle}"
-                                                                    Tag="{Binding IsDirty}" />
                                                         </WrapPanel>
 
                                                         <TextBlock Foreground="#94A3B8"
@@ -1751,11 +1746,6 @@
 
                                                                     <WrapPanel Margin="0,10,0,8">
                                                                         <Button Content="Add Row" Width="100" Margin="0,0,8,0" Command="{Binding AddRowCommand}" />
-                                                                        <Button Content="Save Result"
-                                                                                Width="110"
-                                                                                Command="{Binding SaveCommand}"
-                                                                                Style="{StaticResource DirtyAwareSaveButtonStyle}"
-                                                                                Tag="{Binding IsDirty}" />
                                                                     </WrapPanel>
 
                                                                     <DataGrid ItemsSource="{Binding EditableElements}"
