@@ -1,0 +1,73 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "eastus"
+    },
+    "namePrefix": {
+      "value": "bobtools"
+    },
+    "tags": {
+      "value": {
+        "environment": "dev",
+        "project": "BobTools",
+        "workload": "ocr-broker"
+      }
+    },
+    "apimPublisherName": {
+      "value": "BobTools"
+    },
+    "apimPublisherEmail": {
+      "value": "owner@example.com"
+    },
+    "apimSku": {
+      "value": "Developer"
+    },
+    "apimSkuCapacity": {
+      "value": 1
+    },
+    "apimProductDisplayName": {
+      "value": "BobTools OCR"
+    },
+    "apimProductName": {
+      "value": "bobtools-ocr"
+    },
+    "apimApiName": {
+      "value": "bobtools-ocr-api"
+    },
+    "apimApiPath": {
+      "value": "ocr"
+    },
+    "apimSubscriptionDisplayName": {
+      "value": "BobTools Desktop Clients"
+    },
+    "apimSubscriptionName": {
+      "value": "bobtools-desktop"
+    },
+    "logAnalyticsRetentionInDays": {
+      "value": 30
+    },
+    "azureVisionEndpointSecretName": {
+      "value": "azure-vision-endpoint"
+    },
+    "azureVisionKeySecretName": {
+      "value": "azure-vision-key"
+    },
+    "bobToolsClientKeySecretName": {
+      "value": "bobtools-client-key"
+    },
+    "azureVisionEndpoint": {
+      "value": "https://your-vision-resource.cognitiveservices.azure.com/"
+    },
+    "azureVisionKey": {
+      "value": "REPLACE_WITH_AZURE_VISION_KEY"
+    },
+    "bobToolsClientPrimaryKey": {
+      "value": "REPLACE_WITH_SHARED_BOBTOOLS_CLIENT_KEY"
+    },
+    "bobToolsClientSecondaryKey": {
+      "value": ""
+    }
+  }
+}
